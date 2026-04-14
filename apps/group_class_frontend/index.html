@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>拼课课程系统 - 前端MVP</title>
+  <link rel="stylesheet" href="./css/styles.css?v=20260414b" />
+</head>
+<body>
+  <div class="page-shell">
+    <header class="topbar">
+      <div class="topbar-inner container">
+        <div class="brand-block">
+          <span class="eyebrow">Group Class Enrollment</span>
+          <h1>拼课课程系统</h1>
+          <p>面向家长报名与教务运营协同的拼课看板。</p>
+        </div>
+        <div class="topbar-meta">
+          <span class="meta-pill">前台报名</span>
+          <span class="meta-pill">后台管理</span>
+          <span class="meta-pill">真实联调</span>
+        </div>
+      </div>
+    </header>
+
+    <nav class="nav">
+      <div class="container nav-inner">
+        <div class="nav-group nav-public">
+          <a href="#/public/classes" class="nav-link">前台看板</a>
+        </div>
+        <div class="nav-group nav-admin" id="admin-nav" style="display:none">
+          <a href="#/admin/classes" class="nav-link">课程管理</a>
+          <a href="#/admin/registrations" class="nav-link">报名管理</a>
+        </div>
+        <button class="nav-role-toggle" id="role-toggle" type="button">切换为管理员</button>
+      </div>
+    </nav>
+
+    <main id="app" class="container page-content" aria-live="polite"></main>
+  </div>
+
+  <script type="module" src="./js/app.js?v=20260414b"></script>
+</body>
+</html>
