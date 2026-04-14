@@ -29,6 +29,44 @@ powershell -ExecutionPolicy Bypass -File scripts/start-local.ps1
 powershell -ExecutionPolicy Bypass -File scripts/stop-local.ps1
 ```
 
+## 快速启动（Linux/macOS）
+
+```bash
+chmod +x scripts/start-local.sh scripts/stop-local.sh
+./scripts/start-local.sh
+```
+
+停止服务：
+
+```bash
+./scripts/stop-local.sh
+```
+
+可通过环境变量覆盖：
+
+```bash
+PYTHON_BIN=python3 FRONTEND_PORT=5173 BACKEND_PORT=18000 ./scripts/start-local.sh
+```
+
+## 容器化部署（Docker Compose）
+
+在仓库根目录执行：
+
+```bash
+docker compose up -d --build
+```
+
+访问地址：
+
+- 前端：`http://127.0.0.1:5173/`
+- 后端：`http://127.0.0.1:18000/`
+
+停止并删除容器：
+
+```bash
+docker compose down
+```
+
 ## 测试
 
 ```powershell

@@ -3,3 +3,4 @@ __pycache__/
 .pytest_cache/
 .tmp_front_err.txt
 .tmp_front_out.txt
+.local_pids

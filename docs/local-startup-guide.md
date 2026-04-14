@@ -56,3 +56,7 @@ $env:PYTHONPATH='d:/vscodefile/group_class'; pytest -q tests/group_class_backend
 ```
 
 联调与问题记录见：`docs/integration-selftest-2026-04-13.md`。
+
+## 6. Linux/macOS 与容器化
+
+请参考统一文档：`docs/development-and-deployment.md`。
