@@ -100,5 +100,9 @@ def schema_statements() -> list[str]:
 def apply_schema(connection: sqlite3.Connection, statements: Iterable[str] | None = None) -> None:
     connection.execute("PRAGMA foreign_keys = ON")
     for statement in statements or schema_statements():
-        connection.execute(statement)
+        try:
+            connection.execute(statement)
+        except sqlite3.OperationalError as exc:
+            if "already exists" not in str(exc).lower():
+                raise
     connection.commit()

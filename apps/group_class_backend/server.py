@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import json
 import os
+import sqlite3
 from dataclasses import replace
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, urlparse
 from uuid import uuid4
@@ -19,11 +21,12 @@ from apps.group_class_backend.classes.controller import (
     submit_class_review,
     update_class_draft,
 )
-from apps.group_class_backend.classes.repository import InMemoryClassRepository
+from apps.group_class_backend.classes.repository import InMemoryClassRepository, SQLiteClassRepository
+from apps.group_class_backend.common.enums import ClassStatus
 from apps.group_class_backend.common.error_codes import ErrorCode
 from apps.group_class_backend.common.responses import error_response
-from apps.group_class_backend.common.enums import ClassStatus
 from apps.group_class_backend.models.group_class import GroupClass
+from apps.group_class_backend.persistence.schema import apply_schema
 from apps.group_class_backend.registrations.controller import (
     get_registration_detail,
     list_registrations,
@@ -31,7 +34,11 @@ from apps.group_class_backend.registrations.controller import (
     update_registration_notes,
     update_registration_status,
 )
-from apps.group_class_backend.registrations.repository import InMemoryRegistrationRepository
+from apps.group_class_backend.registrations.repository import (
+    InMemoryRegistrationRepository,
+    SQLiteRegistrationRepository,
+)
+
 
 _DEMO_USERS: dict[str, dict[str, Any]] = {
     "admin": {
@@ -55,7 +62,10 @@ _DEMO_USERS: dict[str, dict[str, Any]] = {
 }
 
 
-def _seed_classes(class_repository: InMemoryClassRepository) -> None:
+def _seed_classes(class_repository: InMemoryClassRepository | SQLiteClassRepository) -> None:
+    if class_repository.list():
+        return
+
     now = datetime.now(timezone.utc)
     class_open = GroupClass.create_draft(
         created_at=now,
@@ -73,8 +83,8 @@ def _seed_classes(class_repository: InMemoryClassRepository) -> None:
         session_count=12,
         waitlist_rule="满员后可加入候补",
         absence_rule="缺课支持一次补录",
-        failure_rule="不成班将统一转班/退款",
-        faq_summary="报名后老师/运营会联系确认",
+        failure_rule="不成班将统一转班或退款",
+        faq_summary="报名后老师或运营会联系确认",
     )
     class_open = replace(
         class_open,
@@ -98,7 +108,7 @@ def _seed_classes(class_repository: InMemoryClassRepository) -> None:
         course_subtitle="周末进阶",
         target_audience="四年级阅读提升学生",
         unsuitable_audience="零基础学员",
-        course_goal="阅读理解与表达",
+        course_goal="阅读理解与表达训练",
         schedule_summary="每周六 10:00-11:30",
         session_count=12,
         waitlist_rule="按候补顺序补位",
@@ -132,11 +142,27 @@ def _seed_classes(class_repository: InMemoryClassRepository) -> None:
 
 
 class AppState:
-    def __init__(self) -> None:
-        self.class_repository = InMemoryClassRepository()
-        self.registration_repository = InMemoryRegistrationRepository()
+    def __init__(self, *, storage: str | None = None, sqlite_path: str | None = None) -> None:
+        self.storage = (storage or os.getenv("GROUP_CLASS_STORAGE", "memory")).strip().lower()
         self.audit_writer = NullAuditWriter()
         self.active_tokens: dict[str, dict[str, Any]] = {}
+        self.sqlite_connection: sqlite3.Connection | None = None
+
+        if self.storage == "sqlite":
+            db_path = Path(sqlite_path or os.getenv("GROUP_CLASS_SQLITE_PATH", ".runtime/group_class.sqlite3"))
+            db_path.parent.mkdir(parents=True, exist_ok=True)
+            self.sqlite_connection = sqlite3.connect(db_path, check_same_thread=False, timeout=30)
+            self.sqlite_connection.execute("PRAGMA foreign_keys = ON")
+            self.sqlite_connection.execute("PRAGMA journal_mode = WAL")
+            apply_schema(self.sqlite_connection)
+            self.class_repository = SQLiteClassRepository(self.sqlite_connection)
+            self.registration_repository = SQLiteRegistrationRepository(self.sqlite_connection)
+        elif self.storage == "memory":
+            self.class_repository = InMemoryClassRepository()
+            self.registration_repository = InMemoryRegistrationRepository()
+        else:
+            raise ValueError("GROUP_CLASS_STORAGE must be 'memory' or 'sqlite'")
+
         _seed_classes(self.class_repository)
 
 
@@ -514,6 +540,7 @@ class GroupClassRequestHandler(BaseHTTPRequestHandler):
 def run(host: str = "127.0.0.1", port: int = 8000) -> None:
     server = ThreadingHTTPServer((host, port), GroupClassRequestHandler)
     print(f"group_class backend running at http://{host}:{port}")
+    print(f"storage={GroupClassRequestHandler.state.storage}")
     server.serve_forever()
 
 

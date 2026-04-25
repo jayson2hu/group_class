@@ -69,6 +69,22 @@ Owner: Codex
   - `python -m pytest tests/group_class_backend -q` -> `91 passed`
   - Unicode 码点检查未发现典型 mojibake 字符残留
 
+## 3.2 2026-04-25 SQLite Runtime 接入进展
+
+- 已新增计划与验收文档：`docs/plans/2026-04-25-sqlite-runtime-plan.md`
+- 后端 `AppState` 已支持通过环境变量选择存储：
+  - `GROUP_CLASS_STORAGE=memory`：默认行为，使用 InMemory repository
+  - `GROUP_CLASS_STORAGE=sqlite`：使用 SQLite repository
+  - `GROUP_CLASS_SQLITE_PATH`：指定 SQLite 文件路径，默认 `.runtime/group_class.sqlite3`
+- `apply_schema()` 已支持重复执行，便于 server 启动时自动确认 schema。
+- SQLite 模式仅在课程表为空时写入 demo seed，避免重启重复插入。
+- 后端 demo seed 中文文案已清洗。
+- 自测结果：
+  - `python -m pytest tests/group_class_backend -q` -> `94 passed`
+  - `node --check apps/group_class_frontend/js/api.js` -> 通过
+  - `node --check apps/group_class_frontend/js/app.js` -> 通过
+  - `python -m py_compile apps/group_class_backend/server.py` -> 通过
+
 ## 4. 仍未完成
 
 ### 4.1 P0 后续收尾
@@ -79,7 +95,7 @@ Owner: Codex
 
 ### 4.2 MVP 增强
 
-- server runtime 仍使用 InMemory repository，尚未接入 SQLite 或真实数据库。
+- server runtime 已支持可选 SQLite 持久化；默认仍为 InMemory，后续可按环境切换。
 - 列表分页参数尚未完整从 HTTP 和前端 UI 透传。
 - 前端缺少课程/报名搜索、筛选和分页控件。
 - 报名成功页还可以展示更完整的课程状态和后续通知说明。
