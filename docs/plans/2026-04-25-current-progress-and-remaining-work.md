@@ -56,12 +56,25 @@ Owner: Codex
 - 新增当前进度和剩余工作记录文档。
 - `.gitignore` 排除本地运行日志、`.runtime/` 和 `.claude/` 私有配置。
 
+## 3.1 2026-04-25 前端文案清洗进展
+
+- 已新增计划与验收文档：`docs/plans/2026-04-25-frontend-copy-cleanup-plan.md`
+- 已清洗前端入口、核心页面渲染文案和 mock 数据：
+  - `apps/group_class_frontend/index.html`
+  - `apps/group_class_frontend/js/app.js`
+  - `apps/group_class_frontend/js/api.js`
+- 自测结果：
+  - `node --check apps/group_class_frontend/js/api.js` -> 通过
+  - `node --check apps/group_class_frontend/js/app.js` -> 通过
+  - `python -m pytest tests/group_class_backend -q` -> `91 passed`
+  - Unicode 码点检查未发现典型 mojibake 字符残留
+
 ## 4. 仍未完成
 
 ### 4.1 P0 后续收尾
 
 - 浏览器端完整人工回归或 E2E 自动化尚未补齐。
-- 部分历史中文文案存在编码遗留问题，需要单独清洗并做 UI 走查。
+- 前端入口、核心页面和 mock 数据的历史中文文案已清洗；仍建议做一次浏览器 UI 走查确认实际渲染。
 - 后台鉴权目前是演示级 token，会话保存在内存中，不适合生产环境。
 
 ### 4.2 MVP 增强

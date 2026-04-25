@@ -1,4 +1,4 @@
-﻿const mockClasses = [
+const mockClasses = [
   {
     classId: "cls_001",
     className: "三年级英语拼课班",
@@ -23,8 +23,8 @@
     groupRule: "满 6 人开班",
     waitlistRule: "满员后可进入候补",
     absenceRule: "缺课支持补录回放",
-    failureRule: "不成班将统一转班/退款",
-    faqSummary: "报名后由老师联系确认",
+    failureRule: "不成班将统一转班或退款",
+    faqSummary: "报名后由老师或运营联系确认",
     actions: ["view", "enroll", "trial"],
     version: 1,
     createdAt: "2026-04-11T10:00:00+08:00",
@@ -52,7 +52,7 @@
     scheduleSummary: "每周六 10:00-11:30",
     targetAudience: "四年级阅读提升学生",
     unsuitableAudience: "零基础学员",
-    courseGoal: "阅读理解与表达",
+    courseGoal: "阅读理解与表达训练",
     groupRule: "满 6 人开班",
     waitlistRule: "按候补顺序补位",
     absenceRule: "支持一次请假",
@@ -101,7 +101,7 @@ const mockRegistrations = [
     studentGrade: "三年级",
     contactInfo: "13800138000",
     englishLevel: "基础",
-    remark: "希望周三晚",
+    remark: "希望周三晚上上课",
     followUpNote: "",
     notes: "",
     submittedAt: "2026-04-13T12:00:00+08:00",
@@ -122,12 +122,8 @@ function mockStatusLabel(status) {
 }
 
 function mockActionsByStatus(status) {
-  if (status === "DRAFT" || status === "REJECTED") {
-    return ["view", "edit", "submit_review"];
-  }
-  if (status === "PENDING_REVIEW") {
-    return ["view", "approve", "reject"];
-  }
+  if (status === "DRAFT" || status === "REJECTED") return ["view", "edit", "submit_review"];
+  if (status === "PENDING_REVIEW") return ["view", "approve", "reject"];
   return ["view"];
 }
 
@@ -245,7 +241,7 @@ export class ApiClient {
         registerType: payload.registerType,
         registrationStatus: "SUBMITTED",
         classStatus: "OPEN_FOR_ENROLLMENT",
-        nextStepText: "提交成功，老师/运营将尽快联系确认",
+        nextStepText: "提交成功，老师或运营将尽快联系确认。",
       };
     }
     const result = await requestJson(`${this.baseUrl}/api/v1/public/registrations`, {
@@ -267,6 +263,7 @@ export class ApiClient {
         minStudents: item.minStudents,
         maxStudents: item.maxStudents,
         status: item.status,
+        statusLabel: item.statusLabel,
         signupDeadline: item.signupDeadline,
         createdAt: item.createdAt,
         actions: mockActionsByStatus(item.status),
@@ -281,13 +278,7 @@ export class ApiClient {
   async getAdminClassDetail(classId) {
     if (this.useMockData) {
       const item = mockClasses.find((entry) => entry.classId === classId);
-      if (!item) {
-        return null;
-      }
-      return {
-        ...item,
-        actions: mockActionsByStatus(item.status),
-      };
+      return item ? { ...item, actions: mockActionsByStatus(item.status) } : null;
     }
     const result = await requestJson(`${this.baseUrl}/api/v1/admin/classes/${classId}`, {
       headers: this.buildHeaders({}, true),
@@ -324,16 +315,9 @@ export class ApiClient {
   async updateClass(classId, payload) {
     if (this.useMockData) {
       const index = mockClasses.findIndex((item) => item.classId === classId);
-      if (index === -1) {
-        throw new Error("class not found");
-      }
+      if (index === -1) throw new Error("class not found");
       const current = mockClasses[index];
-      const next = {
-        ...current,
-        ...payload,
-        version: (current.version || 1) + 1,
-        updatedAt: new Date().toISOString(),
-      };
+      const next = { ...current, ...payload, version: (current.version || 1) + 1, updatedAt: new Date().toISOString() };
       mockClasses[index] = next;
       return next;
     }
@@ -346,9 +330,7 @@ export class ApiClient {
   }
 
   async submitReview(classId, version, actorId) {
-    if (this.useMockData) {
-      return this.mockReviewStatus(classId, version, "PENDING_REVIEW");
-    }
+    if (this.useMockData) return this.mockReviewStatus(classId, version, "PENDING_REVIEW");
     const result = await requestJson(`${this.baseUrl}/api/v1/admin/classes/${classId}/submit-review`, {
       method: "POST",
       headers: this.buildHeaders({ "Content-Type": "application/json" }, true),
@@ -358,9 +340,7 @@ export class ApiClient {
   }
 
   async approveReview(classId, version, actorId) {
-    if (this.useMockData) {
-      return this.mockReviewStatus(classId, version, "OPEN_FOR_ENROLLMENT");
-    }
+    if (this.useMockData) return this.mockReviewStatus(classId, version, "OPEN_FOR_ENROLLMENT");
     const result = await requestJson(`${this.baseUrl}/api/v1/admin/classes/${classId}/approve`, {
       method: "POST",
       headers: this.buildHeaders({ "Content-Type": "application/json" }, true),
@@ -370,9 +350,7 @@ export class ApiClient {
   }
 
   async rejectReview(classId, version, actorId) {
-    if (this.useMockData) {
-      return this.mockReviewStatus(classId, version, "REJECTED");
-    }
+    if (this.useMockData) return this.mockReviewStatus(classId, version, "REJECTED");
     const result = await requestJson(`${this.baseUrl}/api/v1/admin/classes/${classId}/reject`, {
       method: "POST",
       headers: this.buildHeaders({ "Content-Type": "application/json" }, true),
@@ -382,9 +360,7 @@ export class ApiClient {
   }
 
   async getAdminRegistrations(actorId, actorRoles) {
-    if (this.useMockData) {
-      return { items: [...mockRegistrations] };
-    }
+    if (this.useMockData) return { items: [...mockRegistrations] };
     const roles = (actorRoles || []).join(",");
     const result = await requestJson(
       `${this.baseUrl}/api/v1/admin/registrations?actorId=${encodeURIComponent(actorId)}&actorRoles=${encodeURIComponent(roles)}`,
@@ -396,9 +372,7 @@ export class ApiClient {
   async getAdminRegistrationDetail(registrationId, actorId, actorRoles) {
     if (this.useMockData) {
       const item = mockRegistrations.find((entry) => entry.registrationId === registrationId);
-      if (!item) {
-        throw new Error("registration not found");
-      }
+      if (!item) throw new Error("registration not found");
       return item;
     }
     const roles = (actorRoles || []).join(",");
@@ -412,15 +386,8 @@ export class ApiClient {
   async updateRegistrationNotes(registrationId, payload) {
     if (this.useMockData) {
       const index = mockRegistrations.findIndex((entry) => entry.registrationId === registrationId);
-      if (index === -1) {
-        throw new Error("registration not found");
-      }
-      mockRegistrations[index] = {
-        ...mockRegistrations[index],
-        followUpNote: payload.followUpNote,
-        notes: payload.notes,
-        updatedAt: new Date().toISOString(),
-      };
+      if (index === -1) throw new Error("registration not found");
+      mockRegistrations[index] = { ...mockRegistrations[index], followUpNote: payload.followUpNote, notes: payload.notes, updatedAt: new Date().toISOString() };
       return mockRegistrations[index];
     }
     const result = await requestJson(`${this.baseUrl}/api/v1/admin/registrations/${registrationId}/notes`, {
@@ -434,14 +401,8 @@ export class ApiClient {
   async updateRegistrationStatus(registrationId, payload) {
     if (this.useMockData) {
       const index = mockRegistrations.findIndex((entry) => entry.registrationId === registrationId);
-      if (index === -1) {
-        throw new Error("registration not found");
-      }
-      mockRegistrations[index] = {
-        ...mockRegistrations[index],
-        registrationStatus: payload.registrationStatus,
-        updatedAt: new Date().toISOString(),
-      };
+      if (index === -1) throw new Error("registration not found");
+      mockRegistrations[index] = { ...mockRegistrations[index], registrationStatus: payload.registrationStatus, updatedAt: new Date().toISOString() };
       return mockRegistrations[index];
     }
     const result = await requestJson(`${this.baseUrl}/api/v1/admin/registrations/${registrationId}/status`, {
@@ -454,13 +415,9 @@ export class ApiClient {
 
   mockReviewStatus(classId, version, status) {
     const index = mockClasses.findIndex((entry) => entry.classId === classId);
-    if (index === -1) {
-      throw new Error("class not found");
-    }
+    if (index === -1) throw new Error("class not found");
     const current = mockClasses[index];
-    if (version !== current.version) {
-      throw new Error("CLASS_VERSION_CONFLICT");
-    }
+    if (version !== current.version) throw new Error("CLASS_VERSION_CONFLICT");
     const next = {
       ...current,
       status,
