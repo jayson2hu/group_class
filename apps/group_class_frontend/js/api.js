@@ -145,10 +145,62 @@ async function requestJson(url, options = {}) {
   return result;
 }
 
+export const AUTH_TOKEN_KEY = "GROUP_CLASS_AUTH_TOKEN";
+export const AUTH_USER_KEY = "GROUP_CLASS_AUTH_USER";
+
 export class ApiClient {
   constructor(baseUrl = "") {
     this.baseUrl = baseUrl;
     this.useMockData = window.localStorage.getItem("GROUP_CLASS_USE_MOCK_DATA") === "true";
+  }
+
+  getToken() {
+    return window.localStorage.getItem(AUTH_TOKEN_KEY) || "";
+  }
+
+  setAuthSession(session) {
+    if (!session?.token) return;
+    window.localStorage.setItem(AUTH_TOKEN_KEY, session.token);
+    window.localStorage.setItem(AUTH_USER_KEY, JSON.stringify(session));
+  }
+
+  clearAuthSession() {
+    window.localStorage.removeItem(AUTH_TOKEN_KEY);
+    window.localStorage.removeItem(AUTH_USER_KEY);
+  }
+
+  getAuthUser() {
+    const raw = window.localStorage.getItem(AUTH_USER_KEY);
+    if (!raw) return null;
+    try {
+      return JSON.parse(raw);
+    } catch (_error) {
+      return null;
+    }
+  }
+
+  buildHeaders(extraHeaders = {}, withAuth = false) {
+    const headers = { ...extraHeaders };
+    if (withAuth) {
+      const token = this.getToken();
+      if (token) headers.Authorization = `Bearer ${token}`;
+    }
+    return headers;
+  }
+
+  async login(username, password) {
+    const result = await requestJson(`${this.baseUrl}/api/v1/auth/login`, {
+      method: "POST",
+      headers: this.buildHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify({ username, password }),
+    });
+    const session = result.data || result;
+    this.setAuthSession(session);
+    return session;
+  }
+
+  logout() {
+    this.clearAuthSession();
   }
 
   async getPublicClasses() {
@@ -198,7 +250,7 @@ export class ApiClient {
     }
     const result = await requestJson(`${this.baseUrl}/api/v1/public/registrations`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: this.buildHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify(payload),
     });
     return result.data || result;
@@ -220,7 +272,9 @@ export class ApiClient {
         actions: mockActionsByStatus(item.status),
       }));
     }
-    const result = await requestJson(`${this.baseUrl}/api/v1/admin/classes`);
+    const result = await requestJson(`${this.baseUrl}/api/v1/admin/classes`, {
+      headers: this.buildHeaders({}, true),
+    });
     return result.data?.items || result.items || [];
   }
 
@@ -235,7 +289,9 @@ export class ApiClient {
         actions: mockActionsByStatus(item.status),
       };
     }
-    const result = await requestJson(`${this.baseUrl}/api/v1/admin/classes/${classId}`);
+    const result = await requestJson(`${this.baseUrl}/api/v1/admin/classes/${classId}`, {
+      headers: this.buildHeaders({}, true),
+    });
     return result.data || result;
   }
 
@@ -259,7 +315,7 @@ export class ApiClient {
     }
     const result = await requestJson(`${this.baseUrl}/api/v1/admin/classes`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: this.buildHeaders({ "Content-Type": "application/json" }, true),
       body: JSON.stringify(payload),
     });
     return result.data || result;
@@ -283,7 +339,7 @@ export class ApiClient {
     }
     const result = await requestJson(`${this.baseUrl}/api/v1/admin/classes/${classId}/update`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: this.buildHeaders({ "Content-Type": "application/json" }, true),
       body: JSON.stringify(payload),
     });
     return result.data || result;
@@ -295,7 +351,7 @@ export class ApiClient {
     }
     const result = await requestJson(`${this.baseUrl}/api/v1/admin/classes/${classId}/submit-review`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: this.buildHeaders({ "Content-Type": "application/json" }, true),
       body: JSON.stringify({ version, actorId, actorRoles: ["INITIATOR"] }),
     });
     return result.data || result;
@@ -307,7 +363,7 @@ export class ApiClient {
     }
     const result = await requestJson(`${this.baseUrl}/api/v1/admin/classes/${classId}/approve`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: this.buildHeaders({ "Content-Type": "application/json" }, true),
       body: JSON.stringify({ version, actorId, actorRoles: ["CLASS_ADMIN"] }),
     });
     return result.data || result;
@@ -319,7 +375,7 @@ export class ApiClient {
     }
     const result = await requestJson(`${this.baseUrl}/api/v1/admin/classes/${classId}/reject`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: this.buildHeaders({ "Content-Type": "application/json" }, true),
       body: JSON.stringify({ version, actorId, actorRoles: ["CLASS_ADMIN"] }),
     });
     return result.data || result;
@@ -331,7 +387,8 @@ export class ApiClient {
     }
     const roles = (actorRoles || []).join(",");
     const result = await requestJson(
-      `${this.baseUrl}/api/v1/admin/registrations?actorId=${encodeURIComponent(actorId)}&actorRoles=${encodeURIComponent(roles)}`
+      `${this.baseUrl}/api/v1/admin/registrations?actorId=${encodeURIComponent(actorId)}&actorRoles=${encodeURIComponent(roles)}`,
+      { headers: this.buildHeaders({}, true) }
     );
     return result.data || result;
   }
@@ -346,7 +403,8 @@ export class ApiClient {
     }
     const roles = (actorRoles || []).join(",");
     const result = await requestJson(
-      `${this.baseUrl}/api/v1/admin/registrations/${registrationId}?actorId=${encodeURIComponent(actorId)}&actorRoles=${encodeURIComponent(roles)}`
+      `${this.baseUrl}/api/v1/admin/registrations/${registrationId}?actorId=${encodeURIComponent(actorId)}&actorRoles=${encodeURIComponent(roles)}`,
+      { headers: this.buildHeaders({}, true) }
     );
     return result.data || result;
   }
@@ -367,7 +425,7 @@ export class ApiClient {
     }
     const result = await requestJson(`${this.baseUrl}/api/v1/admin/registrations/${registrationId}/notes`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: this.buildHeaders({ "Content-Type": "application/json" }, true),
       body: JSON.stringify(payload),
     });
     return result.data || result;
@@ -388,7 +446,7 @@ export class ApiClient {
     }
     const result = await requestJson(`${this.baseUrl}/api/v1/admin/registrations/${registrationId}/status`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: this.buildHeaders({ "Content-Type": "application/json" }, true),
       body: JSON.stringify(payload),
     });
     return result.data || result;

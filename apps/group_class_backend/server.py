@@ -33,6 +33,27 @@ from apps.group_class_backend.registrations.controller import (
 )
 from apps.group_class_backend.registrations.repository import InMemoryRegistrationRepository
 
+_DEMO_USERS: dict[str, dict[str, Any]] = {
+    "admin": {
+        "password": "123456",
+        "actorId": "u_admin",
+        "actorRoles": ["CLASS_ADMIN"],
+        "displayName": "Admin",
+    },
+    "operator": {
+        "password": "123456",
+        "actorId": "u_operator",
+        "actorRoles": ["OPERATOR"],
+        "displayName": "Operator",
+    },
+    "teacher": {
+        "password": "123456",
+        "actorId": "u_teacher",
+        "actorRoles": ["TEACHER"],
+        "displayName": "Teacher",
+    },
+}
+
 
 def _seed_classes(class_repository: InMemoryClassRepository) -> None:
     now = datetime.now(timezone.utc)
@@ -115,6 +136,7 @@ class AppState:
         self.class_repository = InMemoryClassRepository()
         self.registration_repository = InMemoryRegistrationRepository()
         self.audit_writer = NullAuditWriter()
+        self.active_tokens: dict[str, dict[str, Any]] = {}
         _seed_classes(self.class_repository)
 
 
@@ -131,7 +153,7 @@ class GroupClassRequestHandler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Access-Control-Allow-Origin", "*")
         self.send_header("Access-Control-Allow-Methods", "GET,POST,OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type,Authorization")
         self.end_headers()
         self.wfile.write(body)
 
@@ -146,6 +168,8 @@ class GroupClassRequestHandler(BaseHTTPRequestHandler):
             return 200
         if code == ErrorCode.PERMISSION_DENIED.value:
             return 403
+        if code == ErrorCode.UNAUTHORIZED.value:
+            return 401
         if code == ErrorCode.CLASS_VERSION_CONFLICT.value:
             return 409
         if code == ErrorCode.CLASS_NOT_FOUND.value:
@@ -161,11 +185,32 @@ class GroupClassRequestHandler(BaseHTTPRequestHandler):
         roles = [role.strip() for role in role_text.split(",") if role.strip()]
         return roles or None
 
+    def _parse_bearer_token(self) -> str | None:
+        header = self.headers.get("Authorization", "").strip()
+        if not header.lower().startswith("bearer "):
+            return None
+        token = header[7:].strip()
+        return token or None
+
+    def _require_admin_auth(self, request_id: str) -> dict[str, Any] | None:
+        token = self._parse_bearer_token()
+        if not token or token not in self.state.active_tokens:
+            self._write_json(
+                401,
+                error_response(
+                    request_id=request_id,
+                    code=ErrorCode.UNAUTHORIZED,
+                    details=[{"field": "credentials", "message": "invalid or missing bearer token"}],
+                ),
+            )
+            return None
+        return self.state.active_tokens[token]
+
     def do_OPTIONS(self) -> None:
         self.send_response(204)
         self.send_header("Access-Control-Allow-Origin", "*")
         self.send_header("Access-Control-Allow-Methods", "GET,POST,OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type,Authorization")
         self.end_headers()
 
     def do_GET(self) -> None:
@@ -174,6 +219,10 @@ class GroupClassRequestHandler(BaseHTTPRequestHandler):
         path = parsed.path
 
         try:
+            if path.startswith("/api/v1/admin/"):
+                if self._require_admin_auth(request_id) is None:
+                    return
+
             if path == "/api/v1/public/classes":
                 payload = list_classes(
                     repository=self.state.class_repository,
@@ -272,6 +321,37 @@ class GroupClassRequestHandler(BaseHTTPRequestHandler):
         path = parsed.path
 
         try:
+            if path == "/api/v1/auth/login":
+                body = self._read_json_body()
+                username = str(body.get("username") or "").strip()
+                password = str(body.get("password") or "")
+                profile = _DEMO_USERS.get(username)
+                if profile is None or profile["password"] != password:
+                    self._write_json(
+                        401,
+                        error_response(
+                            request_id=request_id,
+                            code=ErrorCode.UNAUTHORIZED,
+                            details=[{"field": "credentials", "message": "username or password is invalid"}],
+                        ),
+                    )
+                    return
+
+                token = f"tk-{uuid4().hex}"
+                session = {
+                    "token": token,
+                    "actorId": profile["actorId"],
+                    "actorRoles": profile["actorRoles"],
+                    "displayName": profile["displayName"],
+                }
+                self.state.active_tokens[token] = session
+                self._write_json(200, {"requestId": request_id, "code": ErrorCode.OK.value, "data": session})
+                return
+
+            if path.startswith("/api/v1/admin/"):
+                if self._require_admin_auth(request_id) is None:
+                    return
+
             if path == "/api/v1/public/registrations":
                 payload = self._read_json_body()
                 result = submit_registration(
