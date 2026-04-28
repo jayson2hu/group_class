@@ -131,6 +131,26 @@ function mockActionsByStatus(status) {
   return ["view"];
 }
 
+const ERROR_MAP = {
+  "className or templateId is required": "课程名称或模板 ID 为必填",
+  "version does not match current resource": "课程已被他人修改，请刷新后重试",
+  "only DRAFT or REJECTED classes can be submitted for review": "仅草稿或已驳回课程可提交审核",
+  "only PENDING_REVIEW classes can be approved": "仅待审核课程可审核通过",
+  "only PENDING_REVIEW classes can be rejected": "仅待审核课程可驳回",
+  "only CLASS_ADMIN or SUPER_ADMIN can approve class review": "无审核权限，请使用管理员账号",
+  "only CLASS_ADMIN or SUPER_ADMIN can reject class review": "无审核权限，请使用管理员账号",
+  "only CLASS_ADMIN or SUPER_ADMIN can cancel class": "无取消课程权限，请使用管理员账号",
+  "current class status cannot be cancelled": "当前课程状态不可取消",
+  "class status does not accept ENROLLMENT registration": "当前课程状态不接受报名",
+  "class status does not accept WAITLIST registration": "当前课程状态不接受候补",
+  "class not found": "课程不存在",
+  "registration not found": "报名记录不存在",
+};
+
+export function translateErrorMessage(message) {
+  return ERROR_MAP[message] || message;
+}
+
 async function requestJson(url, options = {}, actorId = "u_anonymous", actorRoles = []) {
   const mergedHeaders = {
     ...(options.headers || {}),
@@ -140,11 +160,11 @@ async function requestJson(url, options = {}, actorId = "u_anonymous", actorRole
   const response = await fetch(url, { ...options, headers: mergedHeaders });
   const result = await response.json().catch(() => ({}));
   if (!response.ok) {
-    const message = result?.details?.[0]?.message || result?.code || `Request failed: ${response.status}`;
+    const message = translateErrorMessage(result?.details?.[0]?.message || result?.code || `Request failed: ${response.status}`);
     throw new Error(message);
   }
   if (result?.code && result.code !== "OK") {
-    const message = result?.details?.[0]?.message || result.code;
+    const message = translateErrorMessage(result?.details?.[0]?.message || result.code);
     throw new Error(message);
   }
   return result;

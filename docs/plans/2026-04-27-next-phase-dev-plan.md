@@ -37,7 +37,7 @@ Depends on: docs/plans/2026-04-14-gap-analysis.md（P0-Critical 已全部完成�
 |---|---|---|---|
 | G1 | 课程下架 / 取消状态流转 | 后端 + 前端 | ✅ 已完成 |
 | G2 | 候补表单字段独立化 | 前端 | ✅ 已完成 |
-| G3 | 前端错误提示增强 | 前端 | ⬜ 待开始 |
+| G3 | 前端错误提示增强 | 前端 | ✅ 已完成 |
 | G4 | 分页参数透传 | 后端 + 前端 | ⬜ 待开始 |
 | G5 | 报名成功页：展示课程当前状态 | 前端 | ⬜ 待开始 |
 
@@ -207,6 +207,12 @@ export function translateErrorMessage(msg) {
 2. 权限不足时 toast 显示「无审核权限」
 3. 已知错误有中文提示，未知错误直接显示原始英文
 4. api.js 语法检查通过（`node --check`）
+
+**完成记录（2026-04-28）**
+
+- `api.js` 新增 `translateErrorMessage()` 和常见后端错误中文映射
+- `requestJson()` 抛出的 `Error.message` 已使用中文映射，现有 `app.js` catch/toast 自动展示中文错误
+- 自测：`node --check api.js/app.js` 通过；映射函数验证 version 冲突、权限不足、未知错误；`uv run pytest tests/ -q` -> `125 passed`
 
 ---
 
