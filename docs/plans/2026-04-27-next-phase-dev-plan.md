@@ -36,7 +36,7 @@ Depends on: docs/plans/2026-04-14-gap-analysis.md（P0-Critical 已全部完成�
 | 编号 | 功能 | 范围 | 状态 |
 |---|---|---|---|
 | G1 | 课程下架 / 取消状态流转 | 后端 + 前端 | ✅ 已完成 |
-| G2 | 候补表单字段独立化 | 前端 | ⬜ 待开始 |
+| G2 | 候补表单字段独立化 | 前端 | ✅ 已完成 |
 | G3 | 前端错误提示增强 | 前端 | ⬜ 待开始 |
 | G4 | 分页参数透传 | 后端 + 前端 | ⬜ 待开始 |
 | G5 | 报名成功页：展示课程当前状态 | 前端 | ⬜ 待开始 |
@@ -155,6 +155,14 @@ PRD 7.4 定义候补（WAITLIST）报名表单与正式报名（ENROLLMENT）字
 3. WAITLIST 学员姓名选填，不填可提交
 4. ENROLLMENT 表单无变化
 5. checkbox 值正确传入 API payload
+
+**完成记录（2026-04-28）**
+
+- WAITLIST 表单标题改为「加入候补」，副文案改为满员候补通知说明
+- 学员姓名和英语基础在 WAITLIST 模式下显示为选填，去除 required
+- 新增 `acceptSimilarRecommendation` checkbox，并在 WAITLIST 提交 payload 中传入布尔值
+- mock 报名记录保留 `acceptSimilarRecommendation`
+- 自测：`node --check api.js/app.js` 通过；关键文案/字段 `rg` 检查通过；`uv run pytest tests/ -q` -> `125 passed`
 
 ---
 

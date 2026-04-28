@@ -336,13 +336,20 @@ async function renderPublicDetail(classId) {
 
 function enrollmentFormHtml(classId, registerType = "ENROLLMENT") {
   const isWaitlist = registerType === "WAITLIST";
-  const title = isWaitlist ? "候补申请" : "课程报名";
-  const desc = isWaitlist ? "当前课程名额紧张，先提交候补信息；有空位后老师会尽快联系。" : "填写学员与家长信息后提交，老师会尽快联系确认。";
+  const title = isWaitlist ? "加入候补" : "课程报名";
+  const desc = isWaitlist ? "满员后将按照提交顺序通知，请确认联系方式准确。" : "填写学员与家长信息后提交，老师会尽快联系确认。";
+  const sideTitle = isWaitlist ? "候补流程" : "提交流程";
+  const sideText = isWaitlist ? "提交候补后等待空位，运营会联系确认是否转正。" : "提交后会进入人工确认流程，确认结果会通过电话或微信通知。";
+  const studentNameLabel = isWaitlist ? "学员姓名（选填）" : '学员姓名 <span class="required-mark">*</span>';
+  const englishLevelLabel = isWaitlist ? "英语基础（选填）" : '英语基础 <span class="required-mark">*</span>';
+  const waitlistFields = isWaitlist
+    ? `<label class="checkbox-row full-span"><input type="checkbox" name="acceptSimilarRecommendation" value="true" /><span>是否愿意接受相近课程的推荐（勾选后运营可优先为你匹配其他课程）</span></label>`
+    : "";
   return `
     <section class="panel enrollment-shell">
       <div class="enrollment-hero">
         <div><p class="section-kicker">Enrollment</p><h2>${title}</h2><p class="muted enrollment-hero-text">${desc}</p></div>
-        <aside class="enrollment-side-note"><strong>提交流程</strong><p>提交后会进入人工确认流程，确认结果会通过电话或微信通知。</p></aside>
+        <aside class="enrollment-side-note"><strong>${sideTitle}</strong><p>${sideText}</p></aside>
       </div>
       <form id="registration-form" class="enrollment-form">
         <section class="form-section">
@@ -355,14 +362,14 @@ function enrollmentFormHtml(classId, registerType = "ENROLLMENT") {
         <section class="form-section">
           <div class="form-section-head"><h3>学员信息</h3><p class="muted">帮助老师快速判断分班与课程适配度。</p></div>
           <div class="form-grid two-columns">
-            <div class="row"><label>学员姓名${isWaitlist ? "" : ' <span class="required-mark">*</span>'}</label><input name="studentName" placeholder="请输入学员姓名" ${isWaitlist ? "" : "required"} /></div>
+            <div class="row"><label>${studentNameLabel}</label><input name="studentName" placeholder="请输入学员姓名" ${isWaitlist ? "" : "required"} /></div>
             <div class="row"><label>学员年级 <span class="required-mark">*</span></label><input name="studentGrade" placeholder="如：三年级" required /></div>
-            <div class="row full-span"><label>英语基础${isWaitlist ? "" : ' <span class="required-mark">*</span>'}</label><input name="englishLevel" placeholder="如：校内基础一般，可进行简单阅读" ${isWaitlist ? "" : "required"} /></div>
+            <div class="row full-span"><label>${englishLevelLabel}</label><input name="englishLevel" placeholder="如：校内基础一般，可进行简单阅读" ${isWaitlist ? "" : "required"} /></div>
           </div>
         </section>
         <section class="form-section">
           <div class="form-section-head"><h3>补充说明</h3><p class="muted">可填写时间偏好、学习目标或其他说明。</p></div>
-          <div class="form-grid"><div class="row full-span"><label>备注</label><textarea name="remark" placeholder="如：希望尽量安排工作日晚间时段"></textarea></div></div>
+          <div class="form-grid"><div class="row full-span"><label>备注</label><textarea name="remark" placeholder="如：希望尽量安排工作日晚间时段"></textarea></div>${waitlistFields}</div>
         </section>
         <div class="form-submit-bar">
           <div><strong>提交前请确认信息准确</strong><p class="muted">手机号格式错误会导致无法提交。</p></div>
@@ -418,6 +425,9 @@ function bindEnrollmentSubmit(classId, registerType) {
       acceptWaitlist: true,
       wantsTrial: registerType === "TRIAL",
     };
+    if (registerType === "WAITLIST") {
+      payload.acceptSimilarRecommendation = formData.get("acceptSimilarRecommendation") === "true";
+    }
     try {
       const result = await api.submitRegistration(payload);
       showToast("报名提交成功", "success");

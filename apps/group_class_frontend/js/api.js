@@ -199,6 +199,7 @@ export class ApiClient {
         studentGrade: payload.studentGrade,
         contactInfo: payload.contactInfo,
         englishLevel: payload.englishLevel,
+        acceptSimilarRecommendation: payload.acceptSimilarRecommendation,
         remark: payload.remark,
         followUpNote: payload.followUpNote || "",
         notes: payload.notes || "",
