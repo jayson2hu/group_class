@@ -10,6 +10,7 @@
 
 - Windows（PowerShell）或 Linux/macOS（bash）
 - Python 3.12+
+- uv（依赖管理与后端启动）
 - Node.js（用于前端静态检查，可选）
 - Docker / Docker Compose（容器化部署可选）
 
@@ -50,9 +51,7 @@ powershell -ExecutionPolicy Bypass -File scripts/stop-local.ps1
 ### 5.1 启动后端
 
 ```powershell
-$env:PYTHONPATH='d:/vscodefile/group_class'
-$env:GROUP_CLASS_BACKEND_PORT='18000'
-& 'D:/software/anacond/python.exe' -m apps.group_class_backend.server
+uv run uvicorn apps.group_class_backend.app:app --host 0.0.0.0 --port 18000 --reload
 ```
 
 ### 5.2 启动前端
@@ -102,7 +101,7 @@ docker compose down
 
 ### 7.4 容器说明
 
-- `backend`：`docker/backend.Dockerfile`，运行 `apps.group_class_backend.server`
+- `backend`：`docker/backend.Dockerfile`，运行 `apps.group_class_backend.app:app`
 - `frontend`：`docker/frontend.Dockerfile`，使用 nginx 托管前端静态文件
 
 ## 8. 前后端联调
@@ -130,8 +129,7 @@ location.reload();
 ### 8.1 后端回归
 
 ```powershell
-$env:PYTHONPATH='d:/vscodefile/group_class'
-& 'D:/software/anacond/python.exe' -m pytest tests/group_class_backend -q
+uv run pytest tests/ -q
 ```
 
 ### 8.2 前端语法检查

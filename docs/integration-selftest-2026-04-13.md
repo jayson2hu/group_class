@@ -1,5 +1,7 @@
 # 联调与自测记录（2026-04-13）
 
+> 历史记录：本文记录 2026-04-13 旧 `server.py` 手写 HTTP 服务时期的联调结果。FastAPI 迁移后当前后端入口已变更为 `apps.group_class_backend.app:app`。
+
 ## 1. 目标
 
 - 完成前端 `apps/group_class_frontend/` 与后端 `apps/group_class_backend/server.py` 联调

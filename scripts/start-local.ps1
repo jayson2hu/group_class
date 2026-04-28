@@ -1,6 +1,7 @@
 param(
   [int]$FrontendPort = 5173,
-  [int]$BackendPort = 18000
+  [int]$BackendPort = 18000,
+  [string]$UvBin = "uv"
 )
 
 $ErrorActionPreference = "Stop"
@@ -13,7 +14,7 @@ if (-not (Test-Path $python)) {
 }
 
 $frontCmd = "cd /d $root\apps\group_class_frontend && `"$python`" -m http.server $FrontendPort"
-$backCmd = "cd /d $root && set PYTHONPATH=$root&& set GROUP_CLASS_BACKEND_PORT=$BackendPort&& `"$python`" -m apps.group_class_backend.server"
+$backCmd = "cd /d $root && set PYTHONPATH=$root&& `"$UvBin`" run uvicorn apps.group_class_backend.app:app --host 0.0.0.0 --port $BackendPort"
 
 $frontProc = Start-Process -FilePath "cmd.exe" -ArgumentList "/k", $frontCmd -PassThru
 $backProc = Start-Process -FilePath "cmd.exe" -ArgumentList "/k", $backCmd -PassThru

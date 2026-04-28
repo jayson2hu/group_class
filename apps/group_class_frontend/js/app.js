@@ -83,6 +83,7 @@ function toggleAdminMode() {
   const current = isAdminMode();
   window.localStorage.setItem(ROLE_KEY, current ? "public" : "admin");
   syncAdminIdentityDefaults();
+  api.refreshActor();
   syncAdminNav();
   showToast(current ? "已切换为家长模式" : "已切换为管理员模式", "info");
   if (current && window.location.hash.startsWith("#/admin")) {
@@ -515,7 +516,6 @@ function bindAdminClassForm(classId) {
       waitlistRule: String(formData.get("waitlistRule") || "").trim(),
       failureRule: String(formData.get("failureRule") || "").trim(),
       faqSummary: String(formData.get("faqSummary") || "").trim(),
-      actorId: getActorContext().actorId,
     };
     if (isEdit) payload.version = Number(formData.get("version") || 0);
     Object.keys(payload).forEach((key) => {
@@ -556,7 +556,6 @@ function reviewButtons(detail) {
 }
 
 function bindDetailReview(detail) {
-  const { actorId } = getActorContext();
   const submitBtn = document.getElementById("review-submit-btn");
   const approveBtn = document.getElementById("review-approve-btn");
   const rejectBtn = document.getElementById("review-reject-btn");
@@ -564,7 +563,7 @@ function bindDetailReview(detail) {
     if (!window.confirm("确认提交审核？")) return;
     const restore = setButtonLoading(submitBtn, "提交中...");
     try {
-      await api.submitReview(detail.classId, detail.version, actorId);
+      await api.submitReview(detail.classId, detail.version);
       showToast("已提交审核", "success");
       await renderAdminClassDetail(detail.classId);
     } catch (error) {
@@ -576,7 +575,7 @@ function bindDetailReview(detail) {
     if (!window.confirm("确认审核通过？")) return;
     const restore = setButtonLoading(approveBtn, "处理中...");
     try {
-      await api.approveReview(detail.classId, detail.version, actorId);
+      await api.approveReview(detail.classId, detail.version);
       showToast("审核通过", "success");
       await renderAdminClassDetail(detail.classId);
     } catch (error) {
@@ -588,7 +587,7 @@ function bindDetailReview(detail) {
     if (!window.confirm("确认驳回？")) return;
     const restore = setButtonLoading(rejectBtn, "处理中...");
     try {
-      await api.rejectReview(detail.classId, detail.version, actorId);
+      await api.rejectReview(detail.classId, detail.version);
       showToast("已驳回", "success");
       await renderAdminClassDetail(detail.classId);
     } catch (error) {
@@ -670,14 +669,13 @@ function bindAdminClassQuickActions() {
     if (!target) return;
     const classId = target.getAttribute("data-class-id");
     const action = target.getAttribute("data-action");
-    const { actorId } = getActorContext();
     if (!window.confirm(`确认执行 ${action} ?`)) return;
     try {
       const detail = await api.getAdminClassDetail(classId);
       if (!detail) return;
-      if (action === "submit_review") await api.submitReview(classId, detail.version, actorId);
-      if (action === "approve") await api.approveReview(classId, detail.version, actorId);
-      if (action === "reject") await api.rejectReview(classId, detail.version, actorId);
+      if (action === "submit_review") await api.submitReview(classId, detail.version);
+      if (action === "approve") await api.approveReview(classId, detail.version);
+      if (action === "reject") await api.rejectReview(classId, detail.version);
       showToast("操作成功", "success");
       await renderAdminClasses();
     } catch (error) {
@@ -719,8 +717,7 @@ async function renderAdminClasses() {
 }
 
 async function renderAdminRegistrations() {
-  const { actorId, actorRoles } = getActorContext();
-  const result = await api.getAdminRegistrations(actorId, actorRoles);
+  const result = await api.getAdminRegistrations();
   const items = result.items || [];
   if (!items.length) {
     setHtml(`<section class="panel admin-hero"><div><p class="section-kicker">Admin Registrations</p><h2>报名管理</h2></div></section>${emptyStateHtml("暂无报名", "当前暂无报名记录。")}`);
@@ -757,14 +754,13 @@ async function renderAdminRegistrations() {
 function bindRegistrationDetail(registrationId) {
   const noteForm = document.getElementById("registration-note-form");
   const statusForm = document.getElementById("registration-status-form");
-  const { actorId, actorRoles } = getActorContext();
   if (noteForm) noteForm.addEventListener("submit", async (event) => {
     event.preventDefault();
     const button = noteForm.querySelector("button[type='submit']");
     const restore = setButtonLoading(button, "保存中...");
     try {
       const fd = new FormData(noteForm);
-      await api.updateRegistrationNotes(registrationId, { followUpNote: String(fd.get("followUpNote") || ""), notes: String(fd.get("notes") || ""), actorId, actorRoles });
+      await api.updateRegistrationNotes(registrationId, { followUpNote: String(fd.get("followUpNote") || ""), notes: String(fd.get("notes") || "") });
       showToast("备注已保存", "success");
       await renderAdminRegistrationDetail(registrationId);
     } catch (error) {
@@ -778,7 +774,7 @@ function bindRegistrationDetail(registrationId) {
     const restore = setButtonLoading(button, "更新中...");
     try {
       const fd = new FormData(statusForm);
-      await api.updateRegistrationStatus(registrationId, { registrationStatus: String(fd.get("registrationStatus") || ""), actorId, actorRoles });
+      await api.updateRegistrationStatus(registrationId, { registrationStatus: String(fd.get("registrationStatus") || "") });
       showToast("状态已更新", "success");
       await renderAdminRegistrationDetail(registrationId);
     } catch (error) {
@@ -789,8 +785,7 @@ function bindRegistrationDetail(registrationId) {
 }
 
 async function renderAdminRegistrationDetail(registrationId) {
-  const { actorId, actorRoles } = getActorContext();
-  const detail = await api.getAdminRegistrationDetail(registrationId, actorId, actorRoles);
+  const detail = await api.getAdminRegistrationDetail(registrationId);
   if (!detail) {
     setHtml(errorStateHtml("报名记录不存在", "#/admin/registrations"));
     return;
@@ -841,6 +836,7 @@ async function renderAdminRegistrationDetail(registrationId) {
 
 async function renderRoute() {
   syncAdminIdentityDefaults();
+  api.refreshActor();
   syncAdminNav();
   syncNavState();
   setHtml(loadingHtml());

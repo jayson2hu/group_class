@@ -5,6 +5,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 FRONTEND_PORT="${FRONTEND_PORT:-5173}"
 BACKEND_PORT="${BACKEND_PORT:-18000}"
 PYTHON_BIN="${PYTHON_BIN:-python3}"
+UV_BIN="${UV_BIN:-uv}"
 PID_FILE="${ROOT_DIR}/.local_pids"
 
 if ! command -v "${PYTHON_BIN}" >/dev/null 2>&1; then
@@ -12,17 +13,28 @@ if ! command -v "${PYTHON_BIN}" >/dev/null 2>&1; then
   exit 1
 fi
 
+if ! command -v "${UV_BIN}" >/dev/null 2>&1; then
+  if [[ -x "${HOME}/.local/bin/uv" ]]; then
+    UV_BIN="${HOME}/.local/bin/uv"
+  else
+    echo "uv not found: ${UV_BIN}" >&2
+    exit 1
+  fi
+fi
+
 export PYTHONPATH="${ROOT_DIR}"
 export GROUP_CLASS_BACKEND_HOST="0.0.0.0"
 export GROUP_CLASS_BACKEND_PORT="${BACKEND_PORT}"
 
 pushd "${ROOT_DIR}" >/dev/null
-"${PYTHON_BIN}" -m apps.group_class_backend.server >/tmp/group_class_backend.log 2>&1 &
+nohup "${UV_BIN}" run uvicorn apps.group_class_backend.app:app \
+  --host "${GROUP_CLASS_BACKEND_HOST:-0.0.0.0}" \
+  --port "${BACKEND_PORT}" >/tmp/group_class_backend.log 2>&1 &
 BACKEND_PID=$!
 popd >/dev/null
 
 pushd "${ROOT_DIR}/apps/group_class_frontend" >/dev/null
-"${PYTHON_BIN}" -m http.server "${FRONTEND_PORT}" >/tmp/group_class_frontend.log 2>&1 &
+nohup "${PYTHON_BIN}" -m http.server "${FRONTEND_PORT}" >/tmp/group_class_frontend.log 2>&1 &
 FRONTEND_PID=$!
 popd >/dev/null
 

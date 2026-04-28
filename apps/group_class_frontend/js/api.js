@@ -131,8 +131,13 @@ function mockActionsByStatus(status) {
   return ["view"];
 }
 
-async function requestJson(url, options = {}) {
-  const response = await fetch(url, options);
+async function requestJson(url, options = {}, actorId = "u_anonymous", actorRoles = []) {
+  const mergedHeaders = {
+    ...(options.headers || {}),
+    "X-Actor-Id": actorId,
+    "X-Actor-Roles": actorRoles.join(","),
+  };
+  const response = await fetch(url, { ...options, headers: mergedHeaders });
   const result = await response.json().catch(() => ({}));
   if (!response.ok) {
     const message = result?.details?.[0]?.message || result?.code || `Request failed: ${response.status}`;
@@ -149,13 +154,26 @@ export class ApiClient {
   constructor(baseUrl = "") {
     this.baseUrl = baseUrl;
     this.useMockData = window.localStorage.getItem("GROUP_CLASS_USE_MOCK_DATA") === "true";
+    this._loadActor();
+  }
+
+  _loadActor() {
+    this.actorId = window.localStorage.getItem("GROUP_CLASS_ACTOR_ID") || "u_anonymous";
+    this.actorRoles = (window.localStorage.getItem("GROUP_CLASS_ACTOR_ROLES") || "")
+      .split(",")
+      .map((role) => role.trim())
+      .filter(Boolean);
+  }
+
+  refreshActor() {
+    this._loadActor();
   }
 
   async getPublicClasses() {
     if (this.useMockData) {
       return mockClasses.filter((item) => item.status !== "DRAFT" && item.status !== "REJECTED");
     }
-    const result = await requestJson(`${this.baseUrl}/api/v1/public/classes`);
+    const result = await requestJson(`${this.baseUrl}/api/v1/public/classes`, {}, this.actorId, this.actorRoles);
     return result.data?.items || result.items || [];
   }
 
@@ -163,7 +181,7 @@ export class ApiClient {
     if (this.useMockData) {
       return mockClasses.find((item) => item.classId === classId) || null;
     }
-    const result = await requestJson(`${this.baseUrl}/api/v1/public/classes/${classId}`);
+    const result = await requestJson(`${this.baseUrl}/api/v1/public/classes/${classId}`, {}, this.actorId, this.actorRoles);
     return result.data || result;
   }
 
@@ -196,11 +214,16 @@ export class ApiClient {
         nextStepText: "提交成功，老师/运营将尽快联系确认",
       };
     }
-    const result = await requestJson(`${this.baseUrl}/api/v1/public/registrations`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
+    const result = await requestJson(
+      `${this.baseUrl}/api/v1/public/registrations`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      },
+      this.actorId,
+      this.actorRoles
+    );
     return result.data || result;
   }
 
@@ -220,7 +243,7 @@ export class ApiClient {
         actions: mockActionsByStatus(item.status),
       }));
     }
-    const result = await requestJson(`${this.baseUrl}/api/v1/admin/classes`);
+    const result = await requestJson(`${this.baseUrl}/api/v1/admin/classes`, {}, this.actorId, this.actorRoles);
     return result.data?.items || result.items || [];
   }
 
@@ -235,7 +258,7 @@ export class ApiClient {
         actions: mockActionsByStatus(item.status),
       };
     }
-    const result = await requestJson(`${this.baseUrl}/api/v1/admin/classes/${classId}`);
+    const result = await requestJson(`${this.baseUrl}/api/v1/admin/classes/${classId}`, {}, this.actorId, this.actorRoles);
     return result.data || result;
   }
 
@@ -257,11 +280,16 @@ export class ApiClient {
       mockClasses.unshift(created);
       return created;
     }
-    const result = await requestJson(`${this.baseUrl}/api/v1/admin/classes`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
+    const result = await requestJson(
+      `${this.baseUrl}/api/v1/admin/classes`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      },
+      this.actorId,
+      this.actorRoles
+    );
     return result.data || result;
   }
 
@@ -281,62 +309,79 @@ export class ApiClient {
       mockClasses[index] = next;
       return next;
     }
-    const result = await requestJson(`${this.baseUrl}/api/v1/admin/classes/${classId}/update`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    return result.data || result;
-  }
-
-  async submitReview(classId, version, actorId) {
-    if (this.useMockData) {
-      return this.mockReviewStatus(classId, version, "PENDING_REVIEW");
-    }
-    const result = await requestJson(`${this.baseUrl}/api/v1/admin/classes/${classId}/submit-review`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ version, actorId, actorRoles: ["INITIATOR"] }),
-    });
-    return result.data || result;
-  }
-
-  async approveReview(classId, version, actorId) {
-    if (this.useMockData) {
-      return this.mockReviewStatus(classId, version, "OPEN_FOR_ENROLLMENT");
-    }
-    const result = await requestJson(`${this.baseUrl}/api/v1/admin/classes/${classId}/approve`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ version, actorId, actorRoles: ["CLASS_ADMIN"] }),
-    });
-    return result.data || result;
-  }
-
-  async rejectReview(classId, version, actorId) {
-    if (this.useMockData) {
-      return this.mockReviewStatus(classId, version, "REJECTED");
-    }
-    const result = await requestJson(`${this.baseUrl}/api/v1/admin/classes/${classId}/reject`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ version, actorId, actorRoles: ["CLASS_ADMIN"] }),
-    });
-    return result.data || result;
-  }
-
-  async getAdminRegistrations(actorId, actorRoles) {
-    if (this.useMockData) {
-      return { items: [...mockRegistrations] };
-    }
-    const roles = (actorRoles || []).join(",");
     const result = await requestJson(
-      `${this.baseUrl}/api/v1/admin/registrations?actorId=${encodeURIComponent(actorId)}&actorRoles=${encodeURIComponent(roles)}`
+      `${this.baseUrl}/api/v1/admin/classes/${classId}/update`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      },
+      this.actorId,
+      this.actorRoles
     );
     return result.data || result;
   }
 
-  async getAdminRegistrationDetail(registrationId, actorId, actorRoles) {
+  async submitReview(classId, version) {
+    if (this.useMockData) {
+      return this.mockReviewStatus(classId, version, "PENDING_REVIEW");
+    }
+    const result = await requestJson(
+      `${this.baseUrl}/api/v1/admin/classes/${classId}/submit-review`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ version }),
+      },
+      this.actorId,
+      this.actorRoles
+    );
+    return result.data || result;
+  }
+
+  async approveReview(classId, version) {
+    if (this.useMockData) {
+      return this.mockReviewStatus(classId, version, "OPEN_FOR_ENROLLMENT");
+    }
+    const result = await requestJson(
+      `${this.baseUrl}/api/v1/admin/classes/${classId}/approve`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ version }),
+      },
+      this.actorId,
+      this.actorRoles
+    );
+    return result.data || result;
+  }
+
+  async rejectReview(classId, version) {
+    if (this.useMockData) {
+      return this.mockReviewStatus(classId, version, "REJECTED");
+    }
+    const result = await requestJson(
+      `${this.baseUrl}/api/v1/admin/classes/${classId}/reject`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ version }),
+      },
+      this.actorId,
+      this.actorRoles
+    );
+    return result.data || result;
+  }
+
+  async getAdminRegistrations() {
+    if (this.useMockData) {
+      return { items: [...mockRegistrations] };
+    }
+    const result = await requestJson(`${this.baseUrl}/api/v1/admin/registrations`, {}, this.actorId, this.actorRoles);
+    return result.data || result;
+  }
+
+  async getAdminRegistrationDetail(registrationId) {
     if (this.useMockData) {
       const item = mockRegistrations.find((entry) => entry.registrationId === registrationId);
       if (!item) {
@@ -344,9 +389,11 @@ export class ApiClient {
       }
       return item;
     }
-    const roles = (actorRoles || []).join(",");
     const result = await requestJson(
-      `${this.baseUrl}/api/v1/admin/registrations/${registrationId}?actorId=${encodeURIComponent(actorId)}&actorRoles=${encodeURIComponent(roles)}`
+      `${this.baseUrl}/api/v1/admin/registrations/${registrationId}`,
+      {},
+      this.actorId,
+      this.actorRoles
     );
     return result.data || result;
   }
@@ -365,11 +412,16 @@ export class ApiClient {
       };
       return mockRegistrations[index];
     }
-    const result = await requestJson(`${this.baseUrl}/api/v1/admin/registrations/${registrationId}/notes`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
+    const result = await requestJson(
+      `${this.baseUrl}/api/v1/admin/registrations/${registrationId}/notes`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      },
+      this.actorId,
+      this.actorRoles
+    );
     return result.data || result;
   }
 
@@ -386,11 +438,16 @@ export class ApiClient {
       };
       return mockRegistrations[index];
     }
-    const result = await requestJson(`${this.baseUrl}/api/v1/admin/registrations/${registrationId}/status`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
+    const result = await requestJson(
+      `${this.baseUrl}/api/v1/admin/registrations/${registrationId}/status`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      },
+      this.actorId,
+      this.actorRoles
+    );
     return result.data || result;
   }
 

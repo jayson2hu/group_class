@@ -69,9 +69,21 @@ docker compose down
 
 ## 测试
 
-```powershell
-$env:PYTHONPATH='d:/vscodefile/group_class'
-& 'D:/software/anacond/python.exe' -m pytest tests/group_class_backend -q
+```bash
+uv run pytest tests/ -q
+```
+
+前端语法检查：
+
+```bash
+node --check apps/group_class_frontend/js/api.js
+node --check apps/group_class_frontend/js/app.js
+```
+
+手动启动后端：
+
+```bash
+uv run uvicorn apps.group_class_backend.app:app --host 0.0.0.0 --port 18000 --reload
 ```
 
 ## 文档入口
