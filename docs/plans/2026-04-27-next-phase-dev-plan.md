@@ -1,7 +1,7 @@
 # 拼课系统下一阶段开发计划
 
 Date: 2026-04-27  
-Status: Ready for Codex Execution  
+Status: In Progress  
 Owner: Jayson  
 Review: Claude  
 Depends on: docs/plans/2026-04-14-gap-analysis.md（P0-Critical 已全部完成，前端重设计已全部完成）
@@ -10,10 +10,10 @@ Depends on: docs/plans/2026-04-14-gap-analysis.md（P0-Critical 已全部完成�
 
 ## 当前状态总结
 
-### 已完成（截至 2026-04-27）
+### 已完成（截至 2026-04-28）
 
-**后端 API（91 tests passed）**
-- 全部 14 条路由接入 FastAPI routers（classes CRUD + 审核流 + 注册 CRUD）
+**后端 API（125 tests passed）**
+- 全部 15 条路由接入 FastAPI routers（classes CRUD + 审核流 + 课程取消 + 注册 CRUD）
 - 两套仓储：InMemory（运行态）+ SQLite（测试用）
 - 权限模型：INITIATOR / CLASS_ADMIN / SUPER_ADMIN
 - AuditWriter（NullAuditWriter，结构已定，未持久化）
@@ -33,13 +33,13 @@ Depends on: docs/plans/2026-04-14-gap-analysis.md（P0-Critical 已全部完成�
 
 ### P0-Important（MVP 体验完整，本阶段必做）
 
-| 编号 | 功能 | 范围 |
-|---|---|---|
-| G1 | 课程下架 / 取消状态流转 | 后端 + 前端 |
-| G2 | 候补表单字段独立化 | 前端 |
-| G3 | 前端错误提示增强 | 前端 |
-| G4 | 分页参数透传 | 后端 + 前端 |
-| G5 | 报名成功页：展示课程当前状态 | 前端 |
+| 编号 | 功能 | 范围 | 状态 |
+|---|---|---|---|
+| G1 | 课程下架 / 取消状态流转 | 后端 + 前端 | ✅ 已完成 |
+| G2 | 候补表单字段独立化 | 前端 | ⬜ 待开始 |
+| G3 | 前端错误提示增强 | 前端 | ⬜ 待开始 |
+| G4 | 分页参数透传 | 后端 + 前端 | ⬜ 待开始 |
+| G5 | 报名成功页：展示课程当前状态 | 前端 | ⬜ 待开始 |
 
 ### P1（运营增强，可延后）
 
@@ -115,6 +115,13 @@ curl -X POST http://127.0.0.1:18000/api/v1/admin/classes/{classId}/cancel \
 4. 取消后前台看板不可见该课程
 5. 后台详情页 toast 提示「课程已取消」
 6. pytest 全量通过
+
+**完成记录（2026-04-28）**
+
+- 后端新增 `cancel_class` controller 和 `POST /api/v1/admin/classes/{classId}/cancel`
+- 前端新增 `api.cancelClass()`，后台详情和课程列表操作区支持取消课程
+- 新增/更新 controller 与 API 集成测试
+- 自测：`uv run pytest tests/ -q` -> `125 passed`；`node --check api.js/app.js` 通过
 
 ---
 

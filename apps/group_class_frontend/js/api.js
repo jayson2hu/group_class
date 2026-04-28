@@ -373,6 +373,23 @@ export class ApiClient {
     return result.data || result;
   }
 
+  async cancelClass(classId, version) {
+    if (this.useMockData) {
+      return this.mockReviewStatus(classId, version, "CANCELLED");
+    }
+    const result = await requestJson(
+      `${this.baseUrl}/api/v1/admin/classes/${classId}/cancel`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ version }),
+      },
+      this.actorId,
+      this.actorRoles
+    );
+    return result.data || result;
+  }
+
   async getAdminRegistrations() {
     if (this.useMockData) {
       return { items: [...mockRegistrations] };

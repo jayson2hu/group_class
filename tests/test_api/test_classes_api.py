@@ -31,6 +31,12 @@ def _approve_review(client, class_id: str, version: int, headers: dict[str, str]
     return response.json()["data"]
 
 
+def _approved_class(client, initiator_headers: dict[str, str], admin_headers: dict[str, str]) -> dict:
+    created = _create_class(client, initiator_headers, "取消测试课")
+    submitted = _submit_review(client, created["classId"], created["version"], initiator_headers)
+    return _approve_review(client, created["classId"], submitted["version"], admin_headers)
+
+
 def test_public_list_returns_standard_response(client):
     """TC-C01: 前台列表返回 200，格式正确。"""
 
@@ -215,3 +221,45 @@ def test_rejected_class_is_hidden_publicly(client, initiator_headers, admin_head
 
     ids = {item["classId"] for item in response.json()["data"]["items"]}
     assert created["classId"] not in ids
+
+
+def test_cancel_class_route_allows_admin_and_hides_publicly(client, initiator_headers, admin_headers):
+    """TC-C16: CLASS_ADMIN 可取消已发布课程，取消后前台不可见。"""
+
+    approved = _approved_class(client, initiator_headers, admin_headers)
+    response = client.post(
+        f"/api/v1/admin/classes/{approved['classId']}/cancel",
+        json={"version": approved["version"]},
+        headers=admin_headers,
+    )
+    public_detail = client.get(f"/api/v1/public/classes/{approved['classId']}")
+
+    assert response.status_code == 200
+    assert response.json()["data"]["status"] == "CANCELLED"
+    assert public_detail.status_code == 404
+
+
+def test_cancel_class_route_rejects_initiator(client, initiator_headers, admin_headers):
+    """TC-C17: INITIATOR 角色取消课程返回 403。"""
+
+    approved = _approved_class(client, initiator_headers, admin_headers)
+    response = client.post(
+        f"/api/v1/admin/classes/{approved['classId']}/cancel",
+        json={"version": approved["version"]},
+        headers=initiator_headers,
+    )
+
+    assert response.status_code == 403
+
+
+def test_cancel_class_route_rejects_draft(client, initiator_headers, admin_headers):
+    """TC-C18: DRAFT 状态取消课程返回 400。"""
+
+    created = _create_class(client, initiator_headers)
+    response = client.post(
+        f"/api/v1/admin/classes/{created['classId']}/cancel",
+        json={"version": created["version"]},
+        headers=admin_headers,
+    )
+
+    assert response.status_code == 400

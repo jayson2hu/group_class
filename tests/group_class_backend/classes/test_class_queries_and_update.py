@@ -5,6 +5,7 @@ import sqlite3
 from apps.group_class_backend.audit.interface import NullAuditWriter
 from apps.group_class_backend.classes.controller import (
     approve_class_review,
+    cancel_class,
     create_class_draft,
     get_class_detail,
     list_classes,
@@ -568,7 +569,7 @@ def test_approve_class_review_allows_class_admin_and_persists_reviewer() -> None
     assert response["code"] == ErrorCode.OK
     assert response["data"]["status"] == ClassStatus.OPEN_FOR_ENROLLMENT
     assert response["data"]["version"] == 3
-    assert response["data"]["actions"] == ["view"]
+    assert response["data"]["actions"] == ["view", "cancel"]
     assert response["data"]["reviewerId"] == "reviewer-001"
     assert persisted is not None
     assert persisted.reviewer_id == "reviewer-001"
@@ -1570,3 +1571,85 @@ def test_get_class_detail_returns_not_found() -> None:
         "code": ErrorCode.CLASS_NOT_FOUND,
         "details": [{"field": "classId", "message": "class not found"}],
     }
+
+
+def test_cancel_class_allows_admin_for_published_status_and_hides_from_public() -> None:
+    repository = InMemoryClassRepository()
+    class_id = _seed_class(repository)
+    current = repository.get(class_id)
+    assert current is not None
+    repository.update(replace(current, status=ClassStatus.OPEN_FOR_ENROLLMENT))
+    published = repository.get(class_id)
+    assert published is not None
+
+    response = cancel_class(
+        class_id=class_id,
+        payload={"version": published.version},
+        repository=repository,
+        audit_writer=NullAuditWriter(),
+        request_id="req-cancel-001",
+        actor_id="admin-001",
+        actor_roles=["CLASS_ADMIN"],
+        now=datetime(2026, 4, 12, 19, 0, tzinfo=timezone.utc),
+    )
+    public_detail = get_class_detail(
+        class_id=class_id,
+        repository=repository,
+        request_id="req-cancel-public-detail-001",
+        public_only=True,
+    )
+    public_list = list_classes(
+        repository=repository,
+        request_id="req-cancel-public-list-001",
+        page=1,
+        page_size=10,
+        public_only=True,
+    )
+
+    assert response["code"] == ErrorCode.OK
+    assert response["data"]["status"] == ClassStatus.CANCELLED
+    assert public_detail["code"] == ErrorCode.CLASS_NOT_FOUND
+    assert public_list["data"]["items"] == []
+
+
+def test_cancel_class_rejects_initiator_role() -> None:
+    repository = InMemoryClassRepository()
+    class_id = _seed_class(repository)
+    current = repository.get(class_id)
+    assert current is not None
+    repository.update(replace(current, status=ClassStatus.OPEN_FOR_ENROLLMENT))
+    published = repository.get(class_id)
+    assert published is not None
+
+    response = cancel_class(
+        class_id=class_id,
+        payload={"version": published.version},
+        repository=repository,
+        audit_writer=NullAuditWriter(),
+        request_id="req-cancel-denied-001",
+        actor_id="initiator-001",
+        actor_roles=["INITIATOR"],
+        now=datetime(2026, 4, 12, 19, 10, tzinfo=timezone.utc),
+    )
+
+    assert response["code"] == ErrorCode.PERMISSION_DENIED
+
+
+def test_cancel_class_rejects_draft_status() -> None:
+    repository = InMemoryClassRepository()
+    class_id = _seed_class(repository)
+    current = repository.get(class_id)
+    assert current is not None
+
+    response = cancel_class(
+        class_id=class_id,
+        payload={"version": current.version},
+        repository=repository,
+        audit_writer=NullAuditWriter(),
+        request_id="req-cancel-draft-001",
+        actor_id="admin-001",
+        actor_roles=["CLASS_ADMIN"],
+        now=datetime(2026, 4, 12, 19, 20, tzinfo=timezone.utc),
+    )
+
+    assert response["code"] == ErrorCode.VALIDATION_INVALID_ARGUMENT

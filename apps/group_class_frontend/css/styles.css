@@ -623,6 +623,12 @@ img {
   cursor: pointer;
 }
 
+.action-tag-danger {
+  background: var(--danger-soft);
+  border-color: rgba(220, 38, 38, 0.28);
+  color: var(--danger);
+}
+
 .admin-class-form textarea {
   min-height: 80px;
 }
@@ -895,6 +901,22 @@ button.primary:hover,
 button.primary:focus-visible,
 .btn.primary:focus-visible {
   box-shadow: 0 18px 32px rgba(37, 99, 235, 0.28);
+}
+
+button.danger,
+.btn.danger {
+  background: var(--danger);
+  border-color: transparent;
+  color: #fff;
+  box-shadow: 0 14px 28px rgba(220, 38, 38, 0.2);
+}
+
+button.danger:hover,
+.btn.danger:hover,
+button.danger:focus-visible,
+.btn.danger:focus-visible {
+  border-color: transparent;
+  box-shadow: 0 18px 32px rgba(220, 38, 38, 0.26);
 }
 
 button:disabled {

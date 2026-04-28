@@ -168,8 +168,9 @@ function setButtonLoading(button, text) {
 }
 
 function actionTag(action, classId) {
-  if (["submit_review", "approve", "reject"].includes(action)) {
-    return `<button type="button" class="action-tag action-tag-button" data-class-id="${classId}" data-action="${action}">${action}</button>`;
+  if (["submit_review", "approve", "reject", "cancel"].includes(action)) {
+    const extraClass = action === "cancel" ? " action-tag-danger" : "";
+    return `<button type="button" class="action-tag action-tag-button${extraClass}" data-class-id="${classId}" data-action="${action}">${action}</button>`;
   }
   return `<span class="action-tag">${action}</span>`;
 }
@@ -550,15 +551,18 @@ async function renderAdminEditClass(classId) {
 }
 
 function reviewButtons(detail) {
+  const cancellableStatuses = ["OPEN_FOR_ENROLLMENT", "ALMOST_CONFIRMED", "CONFIRMED", "FULL", "WAITLIST_OPEN", "IN_PROGRESS"];
+  const cancelButton = cancellableStatuses.includes(detail.status) ? '<button class="btn danger" id="class-cancel-btn" type="button">取消课程</button>' : "";
   if (detail.status === "DRAFT" || detail.status === "REJECTED") return '<button class="btn primary" id="review-submit-btn" type="button">提交审核</button>';
   if (detail.status === "PENDING_REVIEW") return '<button class="btn primary" id="review-approve-btn" type="button">审核通过</button><button class="btn" id="review-reject-btn" type="button">驳回</button>';
-  return "";
+  return cancelButton;
 }
 
 function bindDetailReview(detail) {
   const submitBtn = document.getElementById("review-submit-btn");
   const approveBtn = document.getElementById("review-approve-btn");
   const rejectBtn = document.getElementById("review-reject-btn");
+  const cancelBtn = document.getElementById("class-cancel-btn");
   if (submitBtn) submitBtn.addEventListener("click", async () => {
     if (!window.confirm("确认提交审核？")) return;
     const restore = setButtonLoading(submitBtn, "提交中...");
@@ -592,6 +596,18 @@ function bindDetailReview(detail) {
       await renderAdminClassDetail(detail.classId);
     } catch (error) {
       showToast(error.message || "驳回失败", "error");
+      restore();
+    }
+  });
+  if (cancelBtn) cancelBtn.addEventListener("click", async () => {
+    if (!window.confirm("确认取消本课程？此操作不可撤销。")) return;
+    const restore = setButtonLoading(cancelBtn, "取消中...");
+    try {
+      await api.cancelClass(detail.classId, detail.version);
+      showToast("课程已取消", "success");
+      await renderAdminClassDetail(detail.classId);
+    } catch (error) {
+      showToast(error.message || "取消课程失败", "error");
       restore();
     }
   });
@@ -676,6 +692,7 @@ function bindAdminClassQuickActions() {
       if (action === "submit_review") await api.submitReview(classId, detail.version);
       if (action === "approve") await api.approveReview(classId, detail.version);
       if (action === "reject") await api.rejectReview(classId, detail.version);
+      if (action === "cancel") await api.cancelClass(classId, detail.version);
       showToast("操作成功", "success");
       await renderAdminClasses();
     } catch (error) {

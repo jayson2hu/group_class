@@ -8,6 +8,7 @@ from fastapi import APIRouter, Body, Depends, Response
 from apps.group_class_backend.app import get_state, new_request_id
 from apps.group_class_backend.classes.controller import (
     approve_class_review,
+    cancel_class,
     create_class_draft,
     get_class_detail,
     list_classes,
@@ -183,6 +184,28 @@ def admin_reject_review(
 ) -> dict[str, object]:
     state = get_state()
     result = reject_class_review(
+        class_id=class_id,
+        payload=body,
+        repository=state.class_repository,
+        audit_writer=state.audit_writer,
+        request_id=new_request_id(),
+        actor_id=actor.actor_id,
+        actor_roles=actor.actor_roles,
+        now=datetime.now(timezone.utc),
+    )
+    response.status_code = _http_status(result)
+    return result
+
+
+@router.post("/api/v1/admin/classes/{class_id}/cancel")
+def admin_cancel_class(
+    class_id: str,
+    response: Response,
+    body: dict[str, Any] = Body(...),
+    actor: ActorContext = Depends(get_actor),
+) -> dict[str, object]:
+    state = get_state()
+    result = cancel_class(
         class_id=class_id,
         payload=body,
         repository=state.class_repository,

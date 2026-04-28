@@ -96,6 +96,7 @@ Implemented in `apps/group_class_backend/routers/classes.py` and `apps/group_cla
 - `POST /api/v1/admin/classes/{classId}/submit-review`
 - `POST /api/v1/admin/classes/{classId}/approve`
 - `POST /api/v1/admin/classes/{classId}/reject`
+- `POST /api/v1/admin/classes/{classId}/cancel`
 - `GET /api/v1/admin/registrations`
 - `GET /api/v1/admin/registrations/{registrationId}`
 - `POST /api/v1/admin/registrations/{registrationId}/notes`

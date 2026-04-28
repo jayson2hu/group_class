@@ -14,6 +14,14 @@ from apps.group_class_backend.models.group_class import GroupClass
 
 
 _ADMIN_REVIEW_ROLES = {"CLASS_ADMIN", "SUPER_ADMIN"}
+_CANCELLABLE_STATUSES = {
+    ClassStatus.OPEN_FOR_ENROLLMENT,
+    ClassStatus.ALMOST_CONFIRMED,
+    ClassStatus.CONFIRMED,
+    ClassStatus.FULL,
+    ClassStatus.WAITLIST_OPEN,
+    ClassStatus.IN_PROGRESS,
+}
 
 
 class TemplateRepository(Protocol):
@@ -121,6 +129,7 @@ _STATUS_LABELS: dict[ClassStatus, str] = {
     ClassStatus.FULL: "已满员",
     ClassStatus.WAITLIST_OPEN: "候补中",
     ClassStatus.IN_PROGRESS: "进行中",
+    ClassStatus.CANCELLED: "已取消",
 }
 
 
@@ -662,6 +671,56 @@ def reject_class_review(
             request_id=request_id,
             actor_id=actor_id,
             action="class.review_rejected",
+            resource_type="class",
+            resource_id=saved.class_id,
+            metadata={
+                "previousStatus": current.status.value,
+                "status": saved.status.value,
+                "version": saved.version,
+            },
+        )
+    )
+    return success_response(request_id=request_id, data=_serialize_class(saved))
+
+
+def cancel_class(
+    *,
+    class_id: str,
+    payload: dict[str, object],
+    repository: InMemoryClassRepository,
+    audit_writer: AuditWriter,
+    request_id: str,
+    actor_id: str,
+    actor_roles: list[str] | None = None,
+    now: datetime,
+) -> dict[str, object]:
+    current, error = _load_class_for_mutation(
+        class_id=class_id,
+        payload=payload,
+        repository=repository,
+        request_id=request_id,
+    )
+    if error is not None:
+        return error
+    assert current is not None
+
+    if current.status not in _CANCELLABLE_STATUSES:
+        return error_response(
+            request_id=request_id,
+            code=ErrorCode.VALIDATION_INVALID_ARGUMENT,
+            details=[{"field": "status", "message": "current class status cannot be cancelled"}],
+        )
+
+    if not _actor_has_role(actor_roles, _ADMIN_REVIEW_ROLES):
+        return _permission_denied(request_id, "actorRoles", "only CLASS_ADMIN or SUPER_ADMIN can cancel class")
+
+    candidate = replace(current, status=ClassStatus.CANCELLED, updated_at=now)
+    saved = repository.update(candidate)
+    audit_writer.record(
+        AuditEvent(
+            request_id=request_id,
+            actor_id=actor_id,
+            action="class.cancelled",
             resource_type="class",
             resource_id=saved.class_id,
             metadata={
