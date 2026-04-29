@@ -132,6 +132,22 @@ function statusChip(status, label) {
   return `<span class="chip ${status}">${label || status}</span>`;
 }
 
+function classStatusLabel(status) {
+  const mapping = {
+    DRAFT: "草稿",
+    PENDING_REVIEW: "待审核",
+    REJECTED: "已驳回",
+    OPEN_FOR_ENROLLMENT: "报名中",
+    ALMOST_CONFIRMED: "即将成班",
+    CONFIRMED: "已成班",
+    FULL: "已满员",
+    WAITLIST_OPEN: "候补开放",
+    IN_PROGRESS: "进行中",
+    CANCELLED: "已取消",
+  };
+  return mapping[status] || status || "-";
+}
+
 function registrationTypeLabel(type) {
   const mapping = { ENROLLMENT: "报名", WAITLIST: "候补", TRIAL: "试听" };
   return mapping[type] || type || "-";
@@ -405,7 +421,17 @@ function enrollmentFormHtml(classId, registerType = "ENROLLMENT") {
   `;
 }
 
-function renderEnrollmentSuccess(result, classId) {
+async function renderEnrollmentSuccess(result, classId) {
+  let classDetail = null;
+  try {
+    classDetail = await api.getPublicClassDetail(classId);
+  } catch {
+    classDetail = null;
+  }
+  const progressText = classDetail?.progressText || "请保持电话畅通，便于及时确认班级安排。";
+  const waitlistNotice = ["FULL", "WAITLIST_OPEN"].includes(result.classStatus)
+    ? '<p class="muted">您已加入候补，如有空位将尽快通知。</p>'
+    : "";
   setHtml(`
     <section class="panel success-hero">
       <div class="success-icon" aria-hidden="true"></div>
@@ -413,8 +439,8 @@ function renderEnrollmentSuccess(result, classId) {
       <p class="muted">报名编号：${result.registrationId || "-"}</p>
     </section>
     <section class="success-grid">
-      <article class="panel success-card"><h3>报名信息</h3><p><strong>报名类型：</strong>${registrationTypeLabel(result.registerType)}</p><p><strong>报名状态：</strong>${result.registrationStatus || "-"}</p><p><strong>课程状态：</strong>${result.classStatus || "-"}</p></article>
-      <article class="panel success-card"><h3>后续说明</h3><p>${result.nextStepText || "提交成功，老师/运营将尽快联系确认。"}</p><p class="muted">温馨提示：请保持电话畅通，便于及时确认班级安排。</p></article>
+      <article class="panel success-card"><h3>报名信息</h3><p><strong>报名类型：</strong>${registrationTypeLabel(result.registerType)}</p><p><strong>报名状态：</strong>${result.registrationStatus || "-"}</p><p><strong>课程状态：</strong>${classStatusLabel(result.classStatus)}</p></article>
+      <article class="panel success-card"><h3>后续说明</h3><p>${result.nextStepText || "提交成功，老师/运营将尽快联系确认。"}</p><p class="muted">${progressText}</p>${waitlistNotice}</article>
     </section>
     <section class="panel success-actions"><div class="actions"><a class="btn primary" href="#/public/classes">返回看板</a><a class="btn" href="#/public/classes/${classId}">查看课程详情</a></div></section>
   `);
@@ -455,7 +481,7 @@ function bindEnrollmentSubmit(classId, registerType) {
     try {
       const result = await api.submitRegistration(payload);
       showToast("报名提交成功", "success");
-      renderEnrollmentSuccess(result, classId);
+      await renderEnrollmentSuccess(result, classId);
     } catch (error) {
       errorNode.hidden = false;
       errorNode.textContent = error.message || "提交失败，请稍后重试。";

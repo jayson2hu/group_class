@@ -18,7 +18,7 @@ Depends on: docs/plans/2026-04-14-gap-analysis.md（P0-Critical 已全部完成�
 - 权限模型：INITIATOR / CLASS_ADMIN / SUPER_ADMIN
 - AuditWriter（NullAuditWriter，结构已定，未持久化）
 
-**前端（app.js 933行，api.js 529行）**
+**前端（app.js 959行，api.js 529行）**
 - 前台：看板、详情、报名表单（ENROLLMENT/WAITLIST/TRIAL）、报名成功页、底部 FAQ
 - 后台：课程列表、创建、编辑、详情（含审核）、报名列表、报名详情（含备注+状态）
 - 交互：Toast 通知、空/错误状态统一、角色切换（家长/管理员）、路由守卫
@@ -39,7 +39,7 @@ Depends on: docs/plans/2026-04-14-gap-analysis.md（P0-Critical 已全部完成�
 | G2 | 候补表单字段独立化 | 前端 | ✅ 已完成 |
 | G3 | 前端错误提示增强 | 前端 | ✅ 已完成 |
 | G4 | 分页参数透传 | 后端 + 前端 | ✅ 已完成 |
-| G5 | 报名成功页：展示课程当前状态 | 前端 | ⬜ 待开始 |
+| G5 | 报名成功页：展示课程当前状态 | 前端 | ✅ 已完成 |
 
 ### P1（运营增强，可延后）
 
@@ -275,6 +275,13 @@ PRD 7.3 要求报名成功页展示「课程当前状态」，以便家长了解
 2. ENROLLMENT 报名显示 progressText
 3. WAITLIST 报名显示候补说明文案
 4. classId 对应课程不存在时页面不崩溃（静默失败）
+
+**完成记录（2026-04-28）**
+
+- `renderEnrollmentSuccess()` 改为异步拉取课程详情，展示 `progressText`，详情获取失败时静默降级
+- 成功页课程状态改为中文状态标签，覆盖报名中、即将成班、已满员、候补开放等状态
+- `FULL` / `WAITLIST_OPEN` 状态下追加候补说明文案
+- 自测：`node --check api.js/app.js` 通过；`uv run pytest tests/ -q` -> `128 passed`
 
 ---
 
