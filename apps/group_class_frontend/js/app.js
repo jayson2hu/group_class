@@ -8,6 +8,7 @@ const app = document.getElementById("app");
 const ROLE_KEY = "GROUP_CLASS_ROLE";
 const ACTOR_ID_KEY = "GROUP_CLASS_ACTOR_ID";
 const ACTOR_ROLES_KEY = "GROUP_CLASS_ACTOR_ROLES";
+const LIST_PAGE_SIZE = 20;
 
 function showToast(message, type = "info") {
   const safeType = ["success", "error", "info"].includes(type) ? type : "info";
@@ -151,6 +152,25 @@ function parseIntOrNull(value) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+function readPage(queryParams) {
+  const page = Number(queryParams?.get("page") || "1");
+  return Number.isFinite(page) && page > 0 ? Math.floor(page) : 1;
+}
+
+function paginationHtml(baseHash, page, pageSize, total) {
+  const totalPages = Math.max(1, Math.ceil((total || 0) / pageSize));
+  if (totalPages <= 1) return "";
+  const prev = page > 1 ? `<a class="btn pagination-btn" href="${baseHash}?page=${page - 1}">&lt; 上一页</a>` : '<span class="pagination-spacer"></span>';
+  const next = page < totalPages ? `<a class="btn pagination-btn" href="${baseHash}?page=${page + 1}">下一页 &gt;</a>` : '<span class="pagination-spacer"></span>';
+  return `
+    <nav class="pagination-bar" aria-label="分页">
+      ${prev}
+      <span class="pagination-status">第 ${page} / ${totalPages} 页，共 ${total} 条</span>
+      ${next}
+    </nav>
+  `;
+}
+
 function parseIsoOrNull(value) {
   const text = String(value || "").trim();
   return text ? new Date(text).toISOString() : null;
@@ -191,8 +211,11 @@ function publicFaqHtml() {
   `;
 }
 
-async function renderPublicList() {
-  const classes = await api.getPublicClasses();
+async function renderPublicList(queryParams = new URLSearchParams()) {
+  const page = readPage(queryParams);
+  const result = await api.getPublicClasses(page, LIST_PAGE_SIZE);
+  const classes = result.items || [];
+  const total = result.total ?? classes.length;
   if (!classes.length) {
     setHtml(`
       <section class="panel list-hero">
@@ -253,11 +276,12 @@ async function renderPublicList() {
         <p class="muted list-hero-text">统一报名入口，不再群内接龙。家长可先查看课程状态，再进入详情或直接提交报名。</p>
       </div>
       <div class="list-hero-summary">
-        <div class="summary-pill"><span class="summary-label">当前可见课程</span><strong class="summary-value">${classes.length}</strong></div>
+        <div class="summary-pill"><span class="summary-label">当前可见课程</span><strong class="summary-value">${total}</strong></div>
         <div class="summary-pill"><span class="summary-label">报名路径</span><strong class="summary-value">报名 / 候补</strong></div>
       </div>
     </section>
     <section class="grid class-card-grid">${cards}</section>
+    ${paginationHtml("#/public/classes", page, LIST_PAGE_SIZE, total)}
     ${publicFaqHtml()}
   `);
 }
@@ -704,15 +728,18 @@ function bindAdminClassQuickActions() {
       if (action === "reject") await api.rejectReview(classId, detail.version);
       if (action === "cancel") await api.cancelClass(classId, detail.version);
       showToast("操作成功", "success");
-      await renderAdminClasses();
+      await renderRoute();
     } catch (error) {
       showToast(error.message || "操作失败", "error");
     }
   });
 }
 
-async function renderAdminClasses() {
-  const items = await api.getAdminClasses();
+async function renderAdminClasses(queryParams = new URLSearchParams()) {
+  const page = readPage(queryParams);
+  const result = await api.getAdminClasses(page, LIST_PAGE_SIZE);
+  const items = result.items || [];
+  const total = result.total ?? items.length;
   if (!items.length) {
     setHtml(`<section class="panel admin-hero"><div><p class="section-kicker">Admin Classes</p><h2>课程管理列表</h2></div></section>${emptyStateHtml("暂无课程", "当前后台没有课程记录。")}`);
     return;
@@ -736,16 +763,19 @@ async function renderAdminClasses() {
   setHtml(`
     <section class="panel admin-hero">
       <div><p class="section-kicker">Admin Classes</p><h2>课程管理列表</h2><p class="muted admin-hero-text">集中查看课程状态、人数、截止时间与可操作动作。</p></div>
-      <div class="admin-summary-grid"><div class="summary-pill"><span class="summary-label">课程总数</span><strong class="summary-value">${items.length}</strong></div><div class="summary-pill"><a class="btn primary" href="#/admin/classes/new">新建课程</a></div></div>
+      <div class="admin-summary-grid"><div class="summary-pill"><span class="summary-label">课程总数</span><strong class="summary-value">${total}</strong></div><div class="summary-pill"><a class="btn primary" href="#/admin/classes/new">新建课程</a></div></div>
     </section>
     <section id="admin-class-action-list" class="grid admin-class-grid">${cards}</section>
+    ${paginationHtml("#/admin/classes", page, LIST_PAGE_SIZE, total)}
   `);
   bindAdminClassQuickActions();
 }
 
-async function renderAdminRegistrations() {
-  const result = await api.getAdminRegistrations();
+async function renderAdminRegistrations(queryParams = new URLSearchParams()) {
+  const page = readPage(queryParams);
+  const result = await api.getAdminRegistrations(page, LIST_PAGE_SIZE);
   const items = result.items || [];
+  const total = result.total ?? items.length;
   if (!items.length) {
     setHtml(`<section class="panel admin-hero"><div><p class="section-kicker">Admin Registrations</p><h2>报名管理</h2></div></section>${emptyStateHtml("暂无报名", "当前暂无报名记录。")}`);
     return;
@@ -768,13 +798,14 @@ async function renderAdminRegistrations() {
     <section class="panel admin-hero">
       <div><p class="section-kicker">Admin Registrations</p><h2>报名管理</h2><p class="muted admin-hero-text">查看报名记录、跟进备注和状态。</p></div>
       <div class="admin-summary-grid registration-summary-grid">
-        <div class="summary-pill"><span class="summary-label">报名总数</span><strong class="summary-value">${items.length}</strong></div>
+        <div class="summary-pill"><span class="summary-label">报名总数</span><strong class="summary-value">${total}</strong></div>
         <div class="summary-pill"><span class="summary-label">报名</span><strong class="summary-value">${summary.ENROLLMENT}</strong></div>
         <div class="summary-pill"><span class="summary-label">候补</span><strong class="summary-value">${summary.WAITLIST}</strong></div>
         <div class="summary-pill"><span class="summary-label">试听</span><strong class="summary-value">${summary.TRIAL}</strong></div>
       </div>
     </section>
     <section class="grid registration-card-grid">${cards}</section>
+    ${paginationHtml("#/admin/registrations", page, LIST_PAGE_SIZE, total)}
   `);
 }
 
@@ -876,14 +907,14 @@ async function renderRoute() {
 
   const { parts, queryParams } = getHashParts();
   try {
-    if (parts[0] === "public" && parts[1] === "classes" && !parts[2]) return await renderPublicList();
+    if (parts[0] === "public" && parts[1] === "classes" && !parts[2]) return await renderPublicList(queryParams);
     if (parts[0] === "public" && parts[1] === "classes" && parts[2]) return await renderPublicDetail(parts[2]);
     if (parts[0] === "public" && parts[1] === "enroll" && parts[2]) return await renderEnroll(parts[2], queryParams);
     if (parts[0] === "admin" && parts[1] === "classes" && parts[2] === "new") return await renderAdminCreateClass();
     if (parts[0] === "admin" && parts[1] === "classes" && parts[3] === "edit") return await renderAdminEditClass(parts[2]);
-    if (parts[0] === "admin" && parts[1] === "classes" && !parts[2]) return await renderAdminClasses();
+    if (parts[0] === "admin" && parts[1] === "classes" && !parts[2]) return await renderAdminClasses(queryParams);
     if (parts[0] === "admin" && parts[1] === "classes" && parts[2]) return await renderAdminClassDetail(parts[2]);
-    if (parts[0] === "admin" && parts[1] === "registrations" && !parts[2]) return await renderAdminRegistrations();
+    if (parts[0] === "admin" && parts[1] === "registrations" && !parts[2]) return await renderAdminRegistrations(queryParams);
     if (parts[0] === "admin" && parts[1] === "registrations" && parts[2]) return await renderAdminRegistrationDetail(parts[2]);
   } catch (error) {
     setHtml(errorStateHtml(error.message || "页面加载失败", "#/public/classes"));

@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any
 
-from fastapi import APIRouter, Body, Depends, Response
+from fastapi import APIRouter, Body, Depends, Query, Response
 
 from apps.group_class_backend.app import get_state, new_request_id
 from apps.group_class_backend.classes.controller import (
@@ -36,14 +36,23 @@ def _http_status(result: dict[str, Any], fallback: int = 400) -> int:
     return fallback
 
 
+def _effective_page_size(page_size: int, page_size_camel: int | None) -> int:
+    return min(page_size_camel if page_size_camel is not None else page_size, 100)
+
+
 @router.get("/api/v1/public/classes")
-def public_list_classes(response: Response, page: int = 1, page_size: int = 20) -> dict[str, object]:
+def public_list_classes(
+    response: Response,
+    page: int = 1,
+    page_size: int = 20,
+    page_size_camel: int | None = Query(default=None, alias="pageSize"),
+) -> dict[str, object]:
     state = get_state()
     result = list_classes(
         repository=state.class_repository,
         request_id=new_request_id(),
         page=page,
-        page_size=min(page_size, 100),
+        page_size=_effective_page_size(page_size, page_size_camel),
         public_only=True,
     )
     response.status_code = _http_status(result)
@@ -64,13 +73,18 @@ def public_get_class_detail(class_id: str, response: Response) -> dict[str, obje
 
 
 @router.get("/api/v1/admin/classes")
-def admin_list_classes(response: Response, page: int = 1, page_size: int = 20) -> dict[str, object]:
+def admin_list_classes(
+    response: Response,
+    page: int = 1,
+    page_size: int = 20,
+    page_size_camel: int | None = Query(default=None, alias="pageSize"),
+) -> dict[str, object]:
     state = get_state()
     result = list_classes(
         repository=state.class_repository,
         request_id=new_request_id(),
         page=page,
-        page_size=min(page_size, 100),
+        page_size=_effective_page_size(page_size, page_size_camel),
         public_only=False,
     )
     response.status_code = _http_status(result)

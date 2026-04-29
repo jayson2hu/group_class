@@ -947,6 +947,34 @@ button:disabled {
   box-shadow: none;
 }
 
+.pagination-bar {
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) auto minmax(120px, 1fr);
+  align-items: center;
+  gap: 12px;
+  margin: 18px 0 4px;
+}
+
+.pagination-btn:first-child {
+  justify-self: start;
+}
+
+.pagination-btn:last-child {
+  justify-self: end;
+}
+
+.pagination-status {
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 700;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.pagination-spacer {
+  min-height: 42px;
+}
+
 form {
   display: grid;
   gap: 14px;
@@ -1482,6 +1510,19 @@ tbody tr:hover {
   .btn,
   button {
     width: 100%;
+  }
+
+  .pagination-bar {
+    grid-template-columns: 1fr;
+  }
+
+  .pagination-btn,
+  .pagination-status {
+    width: 100%;
+  }
+
+  .pagination-spacer {
+    display: none;
   }
 
   .panel,

@@ -151,6 +151,21 @@ export function translateErrorMessage(message) {
   return ERROR_MAP[message] || message;
 }
 
+function buildPagedUrl(baseUrl, page, pageSize) {
+  const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
+  return `${baseUrl}?${params.toString()}`;
+}
+
+function toPageResult(items, page, pageSize) {
+  const start = Math.max(page - 1, 0) * pageSize;
+  return {
+    page,
+    pageSize,
+    total: items.length,
+    items: items.slice(start, start + pageSize),
+  };
+}
+
 async function requestJson(url, options = {}, actorId = "u_anonymous", actorRoles = []) {
   const mergedHeaders = {
     ...(options.headers || {}),
@@ -189,12 +204,13 @@ export class ApiClient {
     this._loadActor();
   }
 
-  async getPublicClasses() {
+  async getPublicClasses(page = 1, pageSize = 20) {
     if (this.useMockData) {
-      return mockClasses.filter((item) => item.status !== "DRAFT" && item.status !== "REJECTED");
+      const items = mockClasses.filter((item) => item.status !== "DRAFT" && item.status !== "REJECTED");
+      return toPageResult(items, page, pageSize);
     }
-    const result = await requestJson(`${this.baseUrl}/api/v1/public/classes`, {}, this.actorId, this.actorRoles);
-    return result.data?.items || result.items || [];
+    const result = await requestJson(buildPagedUrl(`${this.baseUrl}/api/v1/public/classes`, page, pageSize), {}, this.actorId, this.actorRoles);
+    return result.data || result;
   }
 
   async getPublicClassDetail(classId) {
@@ -248,9 +264,9 @@ export class ApiClient {
     return result.data || result;
   }
 
-  async getAdminClasses() {
+  async getAdminClasses(page = 1, pageSize = 20) {
     if (this.useMockData) {
-      return mockClasses.map((item) => ({
+      const items = mockClasses.map((item) => ({
         classId: item.classId,
         className: item.className,
         classType: item.classType,
@@ -263,9 +279,10 @@ export class ApiClient {
         createdAt: item.createdAt,
         actions: mockActionsByStatus(item.status),
       }));
+      return toPageResult(items, page, pageSize);
     }
-    const result = await requestJson(`${this.baseUrl}/api/v1/admin/classes`, {}, this.actorId, this.actorRoles);
-    return result.data?.items || result.items || [];
+    const result = await requestJson(buildPagedUrl(`${this.baseUrl}/api/v1/admin/classes`, page, pageSize), {}, this.actorId, this.actorRoles);
+    return result.data || result;
   }
 
   async getAdminClassDetail(classId) {
@@ -411,11 +428,11 @@ export class ApiClient {
     return result.data || result;
   }
 
-  async getAdminRegistrations() {
+  async getAdminRegistrations(page = 1, pageSize = 20) {
     if (this.useMockData) {
-      return { items: [...mockRegistrations] };
+      return toPageResult([...mockRegistrations], page, pageSize);
     }
-    const result = await requestJson(`${this.baseUrl}/api/v1/admin/registrations`, {}, this.actorId, this.actorRoles);
+    const result = await requestJson(buildPagedUrl(`${this.baseUrl}/api/v1/admin/registrations`, page, pageSize), {}, this.actorId, this.actorRoles);
     return result.data || result;
   }
 

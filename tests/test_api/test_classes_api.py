@@ -69,8 +69,26 @@ def test_public_list_contains_pagination_fields(client):
     assert len(data["items"]) == 1
 
 
+def test_public_list_accepts_camel_page_size(client):
+    """TC-C04: 前台列表支持 pageSize 查询参数。"""
+
+    response = client.get("/api/v1/public/classes?page=1&pageSize=1")
+
+    data = response.json()["data"]
+    assert data["pageSize"] == 1
+    assert len(data["items"]) == 1
+
+
+def test_public_list_caps_page_size(client):
+    """TC-C05: pageSize 超过 100 时截断。"""
+
+    response = client.get("/api/v1/public/classes?page=1&pageSize=500")
+
+    assert response.json()["data"]["pageSize"] == 100
+
+
 def test_admin_list_contains_draft_class(client):
-    """TC-C04: 后台列表含 DRAFT 课程。"""
+    """TC-C06: 后台列表含 DRAFT 课程。"""
 
     response = client.get("/api/v1/admin/classes")
 
@@ -79,7 +97,7 @@ def test_admin_list_contains_draft_class(client):
 
 
 def test_create_class_returns_draft_version_one(client, initiator_headers):
-    """TC-C05: 创建课程成功，返回 DRAFT 状态，version=1。"""
+    """TC-C07: 创建课程成功，返回 DRAFT 状态，version=1。"""
 
     data = _create_class(client, initiator_headers)
 

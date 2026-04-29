@@ -12,13 +12,13 @@ Depends on: docs/plans/2026-04-14-gap-analysis.md（P0-Critical 已全部完成�
 
 ### 已完成（截至 2026-04-28）
 
-**后端 API（125 tests passed）**
+**后端 API（128 tests passed）**
 - 全部 15 条路由接入 FastAPI routers（classes CRUD + 审核流 + 课程取消 + 注册 CRUD）
 - 两套仓储：InMemory（运行态）+ SQLite（测试用）
 - 权限模型：INITIATOR / CLASS_ADMIN / SUPER_ADMIN
 - AuditWriter（NullAuditWriter，结构已定，未持久化）
 
-**前端（app.js 879行，api.js 417行）**
+**前端（app.js 933行，api.js 529行）**
 - 前台：看板、详情、报名表单（ENROLLMENT/WAITLIST/TRIAL）、报名成功页、底部 FAQ
 - 后台：课程列表、创建、编辑、详情（含审核）、报名列表、报名详情（含备注+状态）
 - 交互：Toast 通知、空/错误状态统一、角色切换（家长/管理员）、路由守卫
@@ -38,7 +38,7 @@ Depends on: docs/plans/2026-04-14-gap-analysis.md（P0-Critical 已全部完成�
 | G1 | 课程下架 / 取消状态流转 | 后端 + 前端 | ✅ 已完成 |
 | G2 | 候补表单字段独立化 | 前端 | ✅ 已完成 |
 | G3 | 前端错误提示增强 | 前端 | ✅ 已完成 |
-| G4 | 分页参数透传 | 后端 + 前端 | ⬜ 待开始 |
+| G4 | 分页参数透传 | 后端 + 前端 | ✅ 已完成 |
 | G5 | 报名成功页：展示课程当前状态 | 前端 | ⬜ 待开始 |
 
 ### P1（运营增强，可延后）
@@ -244,6 +244,13 @@ export function translateErrorMessage(msg) {
 3. 前台看板底部分页控件可见，翻页后列表更新
 4. 后台课程列表同上
 5. pageSize 超过 100 时后端截断为 100
+
+**完成记录（2026-04-28）**
+
+- classes 路由支持 `page_size` 与 `pageSize` 两种查询参数，`pageSize` 超过 100 时后端截断为 100
+- admin registrations 补齐分页参数和 `{page,pageSize,total,items}` 响应结构
+- 前台看板、后台课程列表、后台报名列表从 hash query 读取 `page`，底部渲染上一页/下一页分页控件
+- 自测：`node --check api.js/app.js` 通过；`uv run pytest tests/ -q` -> `128 passed`
 
 ---
 

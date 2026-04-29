@@ -389,6 +389,9 @@ def test_list_registrations_returns_only_owned_class_records_for_initiator() -> 
         "requestId": "req-registration-list-initiator-001",
         "code": ErrorCode.OK,
         "data": {
+            "page": 1,
+            "pageSize": 20,
+            "total": 1,
             "items": [
                 {
                     "registrationId": registration_repository.list()[0].registration_id,

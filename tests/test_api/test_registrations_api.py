@@ -163,8 +163,23 @@ def test_admin_registration_list_with_admin_returns_200(client, approved_class_i
     assert len(response.json()["data"]["items"]) == 1
 
 
+def test_admin_registration_list_contains_pagination_fields(client, approved_class_id, public_headers, admin_headers):
+    """TC-R09: 后台报名列表含分页字段，支持 pageSize。"""
+
+    _submit_enrollment(client, approved_class_id, public_headers)
+    _submit_enrollment(client, approved_class_id, public_headers)
+    response = client.get("/api/v1/admin/registrations?page=1&pageSize=1", headers=admin_headers)
+
+    data = response.json()["data"]
+    assert response.status_code == 200
+    assert data["page"] == 1
+    assert data["pageSize"] == 1
+    assert data["total"] == 2
+    assert len(data["items"]) == 1
+
+
 def test_registration_detail_contains_core_fields(client, approved_class_id, public_headers, admin_headers):
-    """TC-R09: 报名详情字段完整。"""
+    """TC-R10: 报名详情字段完整。"""
 
     registration = _submit_enrollment(client, approved_class_id, public_headers)
     response = client.get(f"/api/v1/admin/registrations/{registration['registrationId']}", headers=admin_headers)
@@ -176,7 +191,7 @@ def test_registration_detail_contains_core_fields(client, approved_class_id, pub
 
 
 def test_update_notes_persists(client, approved_class_id, public_headers, admin_headers):
-    """TC-R10: 更新备注成功，字段持久化。"""
+    """TC-R11: 更新备注成功，字段持久化。"""
 
     registration = _submit_enrollment(client, approved_class_id, public_headers)
     registration_id = registration["registrationId"]
@@ -193,7 +208,7 @@ def test_update_notes_persists(client, approved_class_id, public_headers, admin_
 
 
 def test_update_status_valid_success(client, approved_class_id, public_headers, admin_headers):
-    """TC-R11: 更新状态为 VALID 成功。"""
+    """TC-R12: 更新状态为 VALID 成功。"""
 
     registration = _submit_enrollment(client, approved_class_id, public_headers)
     response = client.post(
@@ -207,7 +222,7 @@ def test_update_status_valid_success(client, approved_class_id, public_headers, 
 
 
 def test_update_status_invalid_value_returns_400(client, approved_class_id, public_headers, admin_headers):
-    """TC-R12: 更新状态为非法值返回 400。"""
+    """TC-R13: 更新状态为非法值返回 400。"""
 
     registration = _submit_enrollment(client, approved_class_id, public_headers)
     response = client.post(
@@ -220,7 +235,7 @@ def test_update_status_invalid_value_returns_400(client, approved_class_id, publ
 
 
 def test_update_notes_without_role_returns_403(client, approved_class_id, public_headers):
-    """TC-R13: 无权限更新备注返回 403。"""
+    """TC-R14: 无权限更新备注返回 403。"""
 
     registration = _submit_enrollment(client, approved_class_id, public_headers)
     response = client.post(

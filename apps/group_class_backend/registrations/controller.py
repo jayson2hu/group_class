@@ -183,6 +183,8 @@ def list_registrations(
     request_id: str,
     actor_id: str,
     actor_roles: list[str] | None = None,
+    page: int = 1,
+    page_size: int = 20,
 ) -> dict[str, object]:
     if not _actor_has_any_role(actor_roles, _BACKOFFICE_VIEW_ROLES):
         return error_response(
@@ -201,12 +203,23 @@ def list_registrations(
         for group_class in class_repository.list()
         if _can_view_registration_class(group_class, actor_id=actor_id, actor_roles=actor_roles)
     }
-    items = [
+    all_items = [
         _serialize_registration_list_item(registration, visible_classes[registration.class_id])
         for registration in registration_repository.list()
         if registration.class_id in visible_classes
     ]
-    return success_response(request_id=request_id, data={"items": items})
+    all_items.sort(key=lambda item: str(item["submittedAt"]), reverse=True)
+    start = max(page - 1, 0) * page_size
+    end = start + page_size
+    return success_response(
+        request_id=request_id,
+        data={
+            "page": page,
+            "pageSize": page_size,
+            "total": len(all_items),
+            "items": all_items[start:end],
+        },
+    )
 
 
 def get_registration_detail(
