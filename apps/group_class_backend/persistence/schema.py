@@ -78,9 +78,27 @@ CREATE TABLE class_templates (
     template_name TEXT NOT NULL,
     class_type TEXT,
     default_price_amount REAL,
+    default_deposit_amount REAL,
+    default_min_students INTEGER,
+    default_max_students INTEGER,
+    default_course_subtitle TEXT,
+    default_target_audience TEXT,
+    default_unsuitable_audience TEXT,
+    default_course_goal TEXT,
+    default_schedule_summary TEXT,
+    default_session_count INTEGER,
+    default_group_rule TEXT,
+    default_absence_rule TEXT,
+    default_waitlist_rule TEXT,
+    default_failure_rule TEXT,
+    default_faq_summary TEXT,
     is_active INTEGER NOT NULL CHECK (is_active IN (0, 1)),
     created_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL
+    updated_at TEXT NOT NULL,
+    CHECK (default_min_students IS NULL OR default_min_students > 0),
+    CHECK (default_session_count IS NULL OR default_session_count > 0),
+    CHECK (default_max_students IS NULL OR default_min_students IS NULL OR default_max_students >= default_min_students),
+    CHECK (default_price_amount IS NULL OR default_deposit_amount IS NULL OR default_deposit_amount <= default_price_amount)
 )
 """.strip()
 

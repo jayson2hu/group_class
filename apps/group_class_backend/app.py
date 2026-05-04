@@ -13,12 +13,14 @@ from apps.group_class_backend.classes.repository import InMemoryClassRepository
 from apps.group_class_backend.common.enums import ClassStatus
 from apps.group_class_backend.models.group_class import GroupClass
 from apps.group_class_backend.registrations.repository import InMemoryRegistrationRepository
+from apps.group_class_backend.templates.repository import InMemoryTemplateRepository
 
 
 class AppState:
     def __init__(self) -> None:
         self.class_repository = InMemoryClassRepository()
         self.registration_repository = InMemoryRegistrationRepository()
+        self.template_repository = InMemoryTemplateRepository()
         self.audit_writer = NullAuditWriter()
         _seed_classes(self.class_repository)
 
@@ -140,6 +142,8 @@ def health() -> dict[str, str]:
 
 from apps.group_class_backend.routers import classes as classes_router
 from apps.group_class_backend.routers import registrations as registrations_router
+from apps.group_class_backend.routers import templates as templates_router
 
 app.include_router(classes_router.router)
 app.include_router(registrations_router.router)
+app.include_router(templates_router.router)

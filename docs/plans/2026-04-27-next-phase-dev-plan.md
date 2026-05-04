@@ -12,7 +12,7 @@ Depends on: docs/plans/2026-04-14-gap-analysis.md（P0-Critical 已全部完成�
 
 ### 已完成（截至 2026-04-28）
 
-**后端 API（128 tests passed）**
+**后端 API（139 tests passed）**
 - 全部 15 条路由接入 FastAPI routers（classes CRUD + 审核流 + 课程取消 + 注册 CRUD）
 - 两套仓储：InMemory（运行态）+ SQLite（测试用）
 - 权限模型：INITIATOR / CLASS_ADMIN / SUPER_ADMIN
@@ -43,16 +43,16 @@ Depends on: docs/plans/2026-04-14-gap-analysis.md（P0-Critical 已全部完成�
 
 ### P1（运营增强，可延后）
 
-| 编号 | 功能 | 范围 |
-|---|---|---|
-| H1 | 模板 CRUD 后端接口 | 后端 |
-| H2 | 模板管理前端页面 | 前端 |
-| H3 | 报名导出（CSV） | 后端 + 前端 |
-| H4 | 课程筛选 / 搜索 | 后端 + 前端 |
-| H5 | 自动状态计算（60% 成班规则） | 后端 |
-| H6 | 候补转正流程 | 后端 + 前端 |
-| H7 | 课程封面 / 亮点 / 负责人字段 | 后端 + 前端 |
-| H8 | 分享链接（复制到剪贴板） | 前端 |
+| 编号 | 功能 | 范围 | 状态 |
+|---|---|---|---|
+| H1 | 模板 CRUD 后端接口 | 后端 | ✅ 已完成 |
+| H2 | 模板管理前端页面 | 前端 | ⬜ 待开始 |
+| H3 | 报名导出（CSV） | 后端 + 前端 | ⬜ 待开始 |
+| H4 | 课程筛选 / 搜索 | 后端 + 前端 | ⬜ 待开始 |
+| H5 | 自动状态计算（60% 成班规则） | 后端 | ⬜ 待开始 |
+| H6 | 候补转正流程 | 后端 + 前端 | ⬜ 待开始 |
+| H7 | 课程封面 / 亮点 / 负责人字段 | 后端 + 前端 | ⬜ 待开始 |
+| H8 | 分享链接（复制到剪贴板） | 前端 | ⬜ 待开始 |
 
 ### P2（业务闭环，暂不纳入）
 
@@ -292,6 +292,13 @@ PRD 7.3 要求报名成功页展示「课程当前状态」，以便家长了解
 **新增**：`TemplateRepository` 实现（InMemory + SQLite）、`create_template` / `update_template` / `list_templates` / `get_template` 控制器函数。  
 **路由**：`POST /api/v1/admin/templates`、`GET /api/v1/admin/templates`、`GET /api/v1/admin/templates/{id}`、`POST /api/v1/admin/templates/{id}/update`。  
 **验收**：对应 pytest 测试全部通过。
+
+**完成记录（2026-04-28）**
+
+- 新增 templates 模块：InMemory/SQLite 仓储、CRUD 控制器、4 条 admin FastAPI 路由
+- 扩展 `class_templates` 表字段，覆盖课程模板默认值，并保留模板名唯一索引
+- 课程创建路由已接入 AppState 中的模板仓储，可通过 `templateId` 继承模板默认值
+- 自测：模板专项 `11 passed`；`uv run pytest tests/ -q` -> `139 passed`
 
 ---
 

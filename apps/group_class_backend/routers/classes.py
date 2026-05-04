@@ -114,6 +114,7 @@ def admin_create_class(
     result = create_class_draft(
         payload=body,
         repository=state.class_repository,
+        template_repository=state.template_repository,
         audit_writer=state.audit_writer,
         request_id=new_request_id(),
         actor_id=actor.actor_id,
