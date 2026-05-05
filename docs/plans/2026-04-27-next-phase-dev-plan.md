@@ -13,14 +13,14 @@ Depends on: docs/plans/2026-04-14-gap-analysis.md（P0-Critical 已全部完成�
 ### 已完成（截至 2026-04-28）
 
 **后端 API（139 tests passed）**
-- 全部 15 条路由接入 FastAPI routers（classes CRUD + 审核流 + 课程取消 + 注册 CRUD）
+- FastAPI routers 已覆盖 classes CRUD、审核流、课程取消、注册 CRUD、模板 CRUD
 - 两套仓储：InMemory（运行态）+ SQLite（测试用）
 - 权限模型：INITIATOR / CLASS_ADMIN / SUPER_ADMIN
 - AuditWriter（NullAuditWriter，结构已定，未持久化）
 
-**前端（app.js 959行，api.js 529行）**
+**前端（app.js 1098行，api.js 639行）**
 - 前台：看板、详情、报名表单（ENROLLMENT/WAITLIST/TRIAL）、报名成功页、底部 FAQ
-- 后台：课程列表、创建、编辑、详情（含审核）、报名列表、报名详情（含备注+状态）
+- 后台：课程列表、创建、编辑、详情（含审核）、模板列表/创建/编辑、报名列表、报名详情（含备注+状态）
 - 交互：Toast 通知、空/错误状态统一、角色切换（家长/管理员）、路由守卫
 
 ### 验收结论（Conditional-Go）
@@ -46,7 +46,7 @@ Depends on: docs/plans/2026-04-14-gap-analysis.md（P0-Critical 已全部完成�
 | 编号 | 功能 | 范围 | 状态 |
 |---|---|---|---|
 | H1 | 模板 CRUD 后端接口 | 后端 | ✅ 已完成 |
-| H2 | 模板管理前端页面 | 前端 | ⬜ 待开始 |
+| H2 | 模板管理前端页面 | 前端 | ✅ 已完成 |
 | H3 | 报名导出（CSV） | 后端 + 前端 | ⬜ 待开始 |
 | H4 | 课程筛选 / 搜索 | 后端 + 前端 | ⬜ 待开始 |
 | H5 | 自动状态计算（60% 成班规则） | 后端 | ⬜ 待开始 |
@@ -308,6 +308,13 @@ PRD 7.3 要求报名成功页展示「课程当前状态」，以便家长了解
 **路由**：`#/admin/templates`、`#/admin/templates/new`、`#/admin/templates/{id}/edit`  
 **页面**：列表（模板名 / 类型 / 状态 / 操作）、创建表单、编辑表单。  
 **验收**：可通过 UI 完整创建和编辑模板，创建课程时模板下拉可选。
+
+**完成记录（2026-04-28）**
+
+- 后台导航新增模板管理入口，支持模板列表、创建、编辑三类页面
+- 前端 API 新增模板列表/详情/创建/更新方法，mock 模式同步支持模板 CRUD
+- 创建课程表单新增模板下拉；从模板列表「用模板建课」会预选对应模板
+- 自测：`node --check api.js/app.js` 通过；`uv run pytest tests/ -q` -> `139 passed`
 
 ---
 

@@ -1334,6 +1334,14 @@ tbody tr:hover {
   grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
 }
 
+.template-card-grid {
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+}
+
+.template-card {
+  margin-bottom: 0;
+}
+
 .admin-class-card-head {
   display: flex;
   justify-content: space-between;
@@ -1364,6 +1372,16 @@ tbody tr:hover {
 .admin-class-card-info dd {
   margin: 0;
   color: var(--text-soft);
+}
+
+.checkbox-row label {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.checkbox-row input {
+  width: auto;
 }
 
 .registration-summary-grid {
@@ -1476,6 +1494,7 @@ tbody tr:hover {
   .faq-grid,
   .registration-summary-grid,
   .registration-card-grid,
+  .template-card-grid,
   .registration-card-info,
   .admin-class-card-info {
     grid-template-columns: 1fr;

@@ -497,7 +497,11 @@ async function renderEnroll(classId, queryParams) {
   bindEnrollmentSubmit(classId, type);
 }
 
-function adminClassFormHtml(detail = {}, isEdit = false) {
+function adminClassFormHtml(detail = {}, isEdit = false, templates = []) {
+  const templateOptions = templates.map((template) => `<option value="${template.templateId}" ${detail.templateId === template.templateId ? "selected" : ""}>${template.templateName}</option>`).join("");
+  const templateSelect = isEdit ? "" : `
+          <div class="row full-span"><label>课程模板</label><select name="templateId"><option value="">不使用模板</option>${templateOptions}</select></div>
+  `;
   return `
     <section class="panel admin-hero">
       <div><p class="section-kicker">Admin Class Form</p><h2>${isEdit ? "编辑课程" : "创建新课程"}</h2><p class="muted admin-hero-text">${isEdit ? "修改课程字段并保存草稿版本。" : "填写课程信息并保存草稿，后续提交审核。"}</p></div>
@@ -507,7 +511,8 @@ function adminClassFormHtml(detail = {}, isEdit = false) {
       <section class="form-section">
         <div class="form-section-head"><h3>基础信息</h3><p class="muted">课程基本属性与价格配置。</p></div>
         <div class="form-grid two-columns">
-          <div class="row"><label>课程名称 <span class="required-mark">*</span></label><input name="className" value="${detail.className || ""}" required /></div>
+          ${templateSelect}
+          <div class="row"><label>课程名称</label><input name="className" value="${detail.className || ""}" /></div>
           <div class="row"><label>课程类型 <span class="required-mark">*</span></label><select name="classType" required><option value="GROUP_CLASS" ${detail.classType === "GROUP_CLASS" ? "selected" : ""}>GROUP_CLASS</option><option value="TRIAL" ${detail.classType === "TRIAL" ? "selected" : ""}>TRIAL</option><option value="NORMAL" ${detail.classType === "NORMAL" ? "selected" : ""}>NORMAL</option></select></div>
           <div class="row"><label>课程副标题</label><input name="courseSubtitle" value="${detail.courseSubtitle || ""}" /></div>
           <div class="row"><label>课程价格</label><input name="priceAmount" type="number" min="0" value="${detail.priceAmount ?? ""}" /></div>
@@ -558,6 +563,7 @@ function bindAdminClassForm(classId) {
     const formData = new FormData(form);
     const payload = {
       className: String(formData.get("className") || "").trim(),
+      templateId: String(formData.get("templateId") || "").trim(),
       classType: String(formData.get("classType") || "").trim(),
       courseSubtitle: String(formData.get("courseSubtitle") || "").trim(),
       priceAmount: parseIntOrNull(formData.get("priceAmount")),
@@ -595,8 +601,9 @@ function bindAdminClassForm(classId) {
   });
 }
 
-async function renderAdminCreateClass() {
-  setHtml(adminClassFormHtml({}, false));
+async function renderAdminCreateClass(queryParams = new URLSearchParams()) {
+  const templates = (await api.getAdminTemplates()).items || [];
+  setHtml(adminClassFormHtml({ templateId: queryParams.get("templateId") || "" }, false, templates.filter((template) => template.isActive)));
   bindAdminClassForm();
 }
 
@@ -608,6 +615,135 @@ async function renderAdminEditClass(classId) {
   }
   setHtml(adminClassFormHtml(detail, true));
   bindAdminClassForm(classId);
+}
+
+function templateFormHtml(detail = {}, isEdit = false) {
+  return `
+    <section class="panel admin-hero">
+      <div><p class="section-kicker">Admin Template Form</p><h2>${isEdit ? "编辑模板" : "创建课程模板"}</h2><p class="muted admin-hero-text">维护课程默认价格、人数、时间与前台展示文案。</p></div>
+    </section>
+    <form id="admin-template-form" class="panel admin-class-form">
+      <section class="form-section">
+        <div class="form-section-head"><h3>基础信息</h3><p class="muted">模板名称会用于创建课程时快速识别。</p></div>
+        <div class="form-grid two-columns">
+          <div class="row"><label>模板名称 <span class="required-mark">*</span></label><input name="templateName" value="${detail.templateName || ""}" required /></div>
+          <div class="row"><label>课程类型</label><select name="classType"><option value="">未设置</option><option value="GROUP_CLASS" ${detail.classType === "GROUP_CLASS" ? "selected" : ""}>GROUP_CLASS</option><option value="TRIAL" ${detail.classType === "TRIAL" ? "selected" : ""}>TRIAL</option><option value="NORMAL" ${detail.classType === "NORMAL" ? "selected" : ""}>NORMAL</option></select></div>
+          <div class="row"><label>默认价格</label><input name="defaultPriceAmount" type="number" min="0" value="${detail.defaultPriceAmount ?? ""}" /></div>
+          <div class="row"><label>默认订金</label><input name="defaultDepositAmount" type="number" min="0" value="${detail.defaultDepositAmount ?? ""}" /></div>
+          <div class="row"><label>最少人数</label><input name="defaultMinStudents" type="number" min="1" value="${detail.defaultMinStudents ?? ""}" /></div>
+          <div class="row"><label>最多人数</label><input name="defaultMaxStudents" type="number" min="1" value="${detail.defaultMaxStudents ?? ""}" /></div>
+          <div class="row"><label>默认课时</label><input name="defaultSessionCount" type="number" min="1" value="${detail.defaultSessionCount ?? ""}" /></div>
+          <div class="row"><label>默认上课安排</label><input name="defaultScheduleSummary" value="${detail.defaultScheduleSummary || ""}" /></div>
+          <div class="row full-span checkbox-row"><label><input name="isActive" type="checkbox" value="true" ${detail.isActive === false ? "" : "checked"} /> 启用模板</label></div>
+        </div>
+      </section>
+      <section class="form-section">
+        <div class="form-section-head"><h3>展示文案</h3><p class="muted">创建课程后会作为详情页默认文案。</p></div>
+        <div class="form-grid two-columns">
+          <div class="row full-span"><label>课程副标题</label><input name="defaultCourseSubtitle" value="${detail.defaultCourseSubtitle || ""}" /></div>
+          <div class="row full-span"><label>适合对象</label><textarea name="defaultTargetAudience">${detail.defaultTargetAudience || ""}</textarea></div>
+          <div class="row full-span"><label>不适合对象</label><textarea name="defaultUnsuitableAudience">${detail.defaultUnsuitableAudience || ""}</textarea></div>
+          <div class="row full-span"><label>课程目标</label><textarea name="defaultCourseGoal">${detail.defaultCourseGoal || ""}</textarea></div>
+          <div class="row"><label>拼班规则</label><textarea name="defaultGroupRule">${detail.defaultGroupRule || ""}</textarea></div>
+          <div class="row"><label>缺课规则</label><textarea name="defaultAbsenceRule">${detail.defaultAbsenceRule || ""}</textarea></div>
+          <div class="row"><label>候补规则</label><textarea name="defaultWaitlistRule">${detail.defaultWaitlistRule || ""}</textarea></div>
+          <div class="row"><label>不成班处理</label><textarea name="defaultFailureRule">${detail.defaultFailureRule || ""}</textarea></div>
+          <div class="row full-span"><label>FAQ 摘要</label><textarea name="defaultFaqSummary">${detail.defaultFaqSummary || ""}</textarea></div>
+        </div>
+      </section>
+      <div class="form-submit-bar"><div><strong>保存模板</strong><p class="muted">保存后返回模板详情页。</p></div><div class="actions form-submit-actions"><button id="admin-template-submit-btn" type="submit" class="primary">保存模板</button><a class="btn" href="#/admin/templates">返回列表</a></div></div>
+      <p id="admin-template-form-error" class="error" hidden></p>
+    </form>
+  `;
+}
+
+function templatePayloadFromForm(formData) {
+  const payload = {
+    templateName: String(formData.get("templateName") || "").trim(),
+    classType: String(formData.get("classType") || "").trim(),
+    defaultPriceAmount: parseIntOrNull(formData.get("defaultPriceAmount")),
+    defaultDepositAmount: parseIntOrNull(formData.get("defaultDepositAmount")),
+    defaultMinStudents: parseIntOrNull(formData.get("defaultMinStudents")),
+    defaultMaxStudents: parseIntOrNull(formData.get("defaultMaxStudents")),
+    defaultSessionCount: parseIntOrNull(formData.get("defaultSessionCount")),
+    defaultScheduleSummary: String(formData.get("defaultScheduleSummary") || "").trim(),
+    defaultCourseSubtitle: String(formData.get("defaultCourseSubtitle") || "").trim(),
+    defaultTargetAudience: String(formData.get("defaultTargetAudience") || "").trim(),
+    defaultUnsuitableAudience: String(formData.get("defaultUnsuitableAudience") || "").trim(),
+    defaultCourseGoal: String(formData.get("defaultCourseGoal") || "").trim(),
+    defaultGroupRule: String(formData.get("defaultGroupRule") || "").trim(),
+    defaultAbsenceRule: String(formData.get("defaultAbsenceRule") || "").trim(),
+    defaultWaitlistRule: String(formData.get("defaultWaitlistRule") || "").trim(),
+    defaultFailureRule: String(formData.get("defaultFailureRule") || "").trim(),
+    defaultFaqSummary: String(formData.get("defaultFaqSummary") || "").trim(),
+    isActive: formData.get("isActive") === "true",
+  };
+  Object.keys(payload).forEach((key) => {
+    if (payload[key] === "" || payload[key] === null) delete payload[key];
+  });
+  return payload;
+}
+
+function bindTemplateForm(templateId) {
+  const form = document.getElementById("admin-template-form");
+  const errorNode = document.getElementById("admin-template-form-error");
+  const submitButton = document.getElementById("admin-template-submit-btn");
+  if (!form || !errorNode || !submitButton) return;
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    errorNode.hidden = true;
+    const restoreButton = setButtonLoading(submitButton, "保存中...");
+    try {
+      const payload = templatePayloadFromForm(new FormData(form));
+      const result = templateId ? await api.updateTemplate(templateId, payload) : await api.createTemplate(payload);
+      showToast("模板已保存", "success");
+      window.location.hash = `#/admin/templates/${result.templateId || templateId}/edit`;
+    } catch (error) {
+      errorNode.textContent = error.message || "模板保存失败";
+      errorNode.hidden = false;
+      showToast(error.message || "模板保存失败", "error");
+      restoreButton();
+    }
+  });
+}
+
+async function renderAdminTemplates() {
+  const result = await api.getAdminTemplates();
+  const items = result.items || [];
+  const cards = items.map((item) => `
+    <article class="panel template-card">
+      <div class="admin-class-card-head"><div><h3>${item.templateName}</h3><p class="muted">ID：${item.templateId}</p></div>${statusChip(item.isActive ? "OPEN_FOR_ENROLLMENT" : "DRAFT", item.isActive ? "启用" : "停用")}</div>
+      <dl class="admin-class-card-info">
+        <div><dt>课程类型</dt><dd>${item.classType || "-"}</dd></div>
+        <div><dt>价格</dt><dd>${item.defaultPriceAmount ?? "-"}</dd></div>
+        <div><dt>人数</dt><dd>${item.defaultMinStudents ?? "-"}/${item.defaultMaxStudents ?? "-"}</dd></div>
+        <div><dt>上课安排</dt><dd>${item.defaultScheduleSummary || "-"}</dd></div>
+      </dl>
+      <div class="actions"><a class="btn" href="#/admin/templates/${item.templateId}/edit">编辑</a><a class="btn" href="#/admin/classes/new?templateId=${item.templateId}">用模板建课</a></div>
+    </article>
+  `).join("");
+  setHtml(`
+    <section class="panel admin-hero">
+      <div><p class="section-kicker">Admin Templates</p><h2>模板管理</h2><p class="muted admin-hero-text">维护常用课程模板，创建课程时可直接选用。</p></div>
+      <div class="admin-summary-grid"><div class="summary-pill"><span class="summary-label">模板总数</span><strong class="summary-value">${items.length}</strong></div><div class="summary-pill"><a class="btn primary" href="#/admin/templates/new">新建模板</a></div></div>
+    </section>
+    ${items.length ? `<section class="grid template-card-grid">${cards}</section>` : emptyStateHtml("暂无模板", "当前没有课程模板。")}
+  `);
+}
+
+async function renderAdminCreateTemplate() {
+  setHtml(templateFormHtml({}, false));
+  bindTemplateForm();
+}
+
+async function renderAdminEditTemplate(templateId) {
+  const detail = await api.getAdminTemplateDetail(templateId);
+  if (!detail) {
+    setHtml(errorStateHtml("模板不存在", "#/admin/templates"));
+    return;
+  }
+  setHtml(templateFormHtml(detail, true));
+  bindTemplateForm(templateId);
 }
 
 function reviewButtons(detail) {
@@ -936,10 +1072,13 @@ async function renderRoute() {
     if (parts[0] === "public" && parts[1] === "classes" && !parts[2]) return await renderPublicList(queryParams);
     if (parts[0] === "public" && parts[1] === "classes" && parts[2]) return await renderPublicDetail(parts[2]);
     if (parts[0] === "public" && parts[1] === "enroll" && parts[2]) return await renderEnroll(parts[2], queryParams);
-    if (parts[0] === "admin" && parts[1] === "classes" && parts[2] === "new") return await renderAdminCreateClass();
+    if (parts[0] === "admin" && parts[1] === "classes" && parts[2] === "new") return await renderAdminCreateClass(queryParams);
     if (parts[0] === "admin" && parts[1] === "classes" && parts[3] === "edit") return await renderAdminEditClass(parts[2]);
     if (parts[0] === "admin" && parts[1] === "classes" && !parts[2]) return await renderAdminClasses(queryParams);
     if (parts[0] === "admin" && parts[1] === "classes" && parts[2]) return await renderAdminClassDetail(parts[2]);
+    if (parts[0] === "admin" && parts[1] === "templates" && parts[2] === "new") return await renderAdminCreateTemplate();
+    if (parts[0] === "admin" && parts[1] === "templates" && parts[3] === "edit") return await renderAdminEditTemplate(parts[2]);
+    if (parts[0] === "admin" && parts[1] === "templates" && !parts[2]) return await renderAdminTemplates();
     if (parts[0] === "admin" && parts[1] === "registrations" && !parts[2]) return await renderAdminRegistrations(queryParams);
     if (parts[0] === "admin" && parts[1] === "registrations" && parts[2]) return await renderAdminRegistrationDetail(parts[2]);
   } catch (error) {

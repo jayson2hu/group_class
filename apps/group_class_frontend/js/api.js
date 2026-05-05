@@ -109,6 +109,32 @@ const mockRegistrations = [
   },
 ];
 
+const mockTemplates = [
+  {
+    templateId: "tpl_mock_001",
+    templateName: "周末英语拼课模板",
+    classType: "GROUP_CLASS",
+    defaultPriceAmount: 1999,
+    defaultDepositAmount: 300,
+    defaultMinStudents: 4,
+    defaultMaxStudents: 8,
+    defaultCourseSubtitle: "周末小班",
+    defaultTargetAudience: "三至四年级学员",
+    defaultUnsuitableAudience: "零基础启蒙学员",
+    defaultCourseGoal: "阅读理解与口语表达",
+    defaultScheduleSummary: "每周六 10:00-11:30",
+    defaultSessionCount: 12,
+    defaultGroupRule: "满 4 人开班",
+    defaultAbsenceRule: "支持一次请假",
+    defaultWaitlistRule: "满员后按提交顺序候补",
+    defaultFailureRule: "不成班转推荐课程",
+    defaultFaqSummary: "报名后运营联系确认",
+    isActive: true,
+    createdAt: "2026-04-13T10:00:00+08:00",
+    updatedAt: "2026-04-13T10:00:00+08:00",
+  },
+];
+
 function mockStatusLabel(status) {
   const labelMap = {
     DRAFT: "草稿",
@@ -144,6 +170,7 @@ const ERROR_MAP = {
   "class status does not accept ENROLLMENT registration": "当前课程状态不接受报名",
   "class status does not accept WAITLIST registration": "当前课程状态不接受候补",
   "class not found": "课程不存在",
+  "template not found": "模板不存在",
   "registration not found": "报名记录不存在",
 };
 
@@ -300,11 +327,94 @@ export class ApiClient {
     return result.data || result;
   }
 
+  async getAdminTemplates() {
+    if (this.useMockData) {
+      return { items: [...mockTemplates] };
+    }
+    const result = await requestJson(`${this.baseUrl}/api/v1/admin/templates`, {}, this.actorId, this.actorRoles);
+    return result.data || result;
+  }
+
+  async getAdminTemplateDetail(templateId) {
+    if (this.useMockData) {
+      return mockTemplates.find((item) => item.templateId === templateId) || null;
+    }
+    const result = await requestJson(`${this.baseUrl}/api/v1/admin/templates/${templateId}`, {}, this.actorId, this.actorRoles);
+    return result.data || result;
+  }
+
+  async createTemplate(payload) {
+    if (this.useMockData) {
+      const now = new Date().toISOString();
+      const created = {
+        templateId: `tpl_${Date.now()}`,
+        ...payload,
+        isActive: payload.isActive ?? true,
+        createdAt: now,
+        updatedAt: now,
+      };
+      mockTemplates.unshift(created);
+      return created;
+    }
+    const result = await requestJson(
+      `${this.baseUrl}/api/v1/admin/templates`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      },
+      this.actorId,
+      this.actorRoles
+    );
+    return result.data || result;
+  }
+
+  async updateTemplate(templateId, payload) {
+    if (this.useMockData) {
+      const index = mockTemplates.findIndex((item) => item.templateId === templateId);
+      if (index === -1) {
+        throw new Error("template not found");
+      }
+      const next = { ...mockTemplates[index], ...payload, updatedAt: new Date().toISOString() };
+      mockTemplates[index] = next;
+      return next;
+    }
+    const result = await requestJson(
+      `${this.baseUrl}/api/v1/admin/templates/${templateId}/update`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      },
+      this.actorId,
+      this.actorRoles
+    );
+    return result.data || result;
+  }
+
   async createClass(payload) {
     if (this.useMockData) {
       const classId = `cls_${Date.now()}`;
+      const template = payload.templateId ? mockTemplates.find((item) => item.templateId === payload.templateId) : null;
       const created = {
         classId,
+        className: template?.templateName,
+        classType: template?.classType,
+        priceAmount: template?.defaultPriceAmount,
+        depositAmount: template?.defaultDepositAmount,
+        minStudents: template?.defaultMinStudents,
+        maxStudents: template?.defaultMaxStudents,
+        courseSubtitle: template?.defaultCourseSubtitle,
+        targetAudience: template?.defaultTargetAudience,
+        unsuitableAudience: template?.defaultUnsuitableAudience,
+        courseGoal: template?.defaultCourseGoal,
+        scheduleSummary: template?.defaultScheduleSummary,
+        sessionCount: template?.defaultSessionCount,
+        groupRule: template?.defaultGroupRule,
+        absenceRule: template?.defaultAbsenceRule,
+        waitlistRule: template?.defaultWaitlistRule,
+        failureRule: template?.defaultFailureRule,
+        faqSummary: template?.defaultFaqSummary,
         ...payload,
         status: "DRAFT",
         statusLabel: mockStatusLabel("DRAFT"),
