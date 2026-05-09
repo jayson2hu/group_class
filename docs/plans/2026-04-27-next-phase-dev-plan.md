@@ -12,7 +12,7 @@ Depends on: docs/plans/2026-04-14-gap-analysis.md（P0-Critical 已全部完成�
 
 ### 已完成（截至 2026-04-28）
 
-**后端 API（144 tests passed）**
+**后端 API（146 tests passed）**
 - FastAPI routers 已覆盖 classes CRUD、审核流、课程取消、注册 CRUD、报名导出、模板 CRUD
 - 两套仓储：InMemory（运行态）+ SQLite（测试用）
 - 权限模型：INITIATOR / CLASS_ADMIN / SUPER_ADMIN
@@ -49,7 +49,7 @@ Depends on: docs/plans/2026-04-14-gap-analysis.md（P0-Critical 已全部完成�
 | H2 | 模板管理前端页面 | 前端 | ✅ 已完成 |
 | H3 | 报名导出（CSV） | 后端 + 前端 | ✅ 已完成 |
 | H4 | 课程筛选 / 搜索 | 后端 + 前端 | ✅ 已完成 |
-| H5 | 自动状态计算（60% 成班规则） | 后端 | ⬜ 待开始 |
+| H5 | 自动状态计算（60% 成班规则） | 后端 | ✅ 已完成 |
 | H6 | 候补转正流程 | 后端 + 前端 | ⬜ 待开始 |
 | H7 | 课程封面 / 亮点 / 负责人字段 | 后端 + 前端 | ⬜ 待开始 |
 | H8 | 分享链接（复制到剪贴板） | 前端 | ⬜ 待开始 |
@@ -353,6 +353,13 @@ PRD 7.3 要求报名成功页展示「课程当前状态」，以便家长了解
 **背景**：PRD 8.3 建议当报名人数 ≥ 60% × max_students 时自动切换为 `ALMOST_CONFIRMED`，≥ 100% 时切换为 `FULL`。  
 **后端**：在 `registrations/controller.py` 的 `submit_registration` 成功后，根据 `current_students / max_students` 比例更新课程状态（仅当当前状态为 `OPEN_FOR_ENROLLMENT`）。  
 **验收**：第 5 人报名（6 人班）后课程自动变 `ALMOST_CONFIRMED`；第 6 人后变 `FULL`。
+
+**完成记录（2026-05-09）**
+
+- ENROLLMENT 报名成功后按 `current_students / max_students` 自动计算课程状态
+- `OPEN_FOR_ENROLLMENT` 下达到满员时切换 `FULL`，达到成班阈值时切换 `ALMOST_CONFIRMED`
+- 报名成功响应中的 `classStatus` 返回更新后的课程状态
+- 自测：报名控制器专项 `19 passed`；`uv run pytest tests/ -q` -> `146 passed`
 
 ---
 

@@ -90,6 +90,16 @@ def _serialize_result(registration: Registration, class_status: ClassStatus) -> 
     }
 
 
+def _status_after_enrollment(group_class: GroupClass, next_current_students: int) -> ClassStatus:
+    if group_class.status != ClassStatus.OPEN_FOR_ENROLLMENT or group_class.max_students is None:
+        return group_class.status
+    if next_current_students >= group_class.max_students:
+        return ClassStatus.FULL
+    if next_current_students / group_class.max_students >= 0.6:
+        return ClassStatus.ALMOST_CONFIRMED
+    return group_class.status
+
+
 def _actor_has_any_role(actor_roles: list[str] | None, allowed_roles: set[str]) -> bool:
     if actor_roles is None:
         return False
@@ -478,7 +488,15 @@ def submit_registration(
     if registration_type == RegistrationType.WAITLIST:
         updated_class = class_repository.update(replace(group_class, waitlist_count=group_class.waitlist_count + 1, updated_at=now))
     elif registration_type == RegistrationType.ENROLLMENT:
-        updated_class = class_repository.update(replace(group_class, current_students=group_class.current_students + 1, updated_at=now))
+        next_current_students = group_class.current_students + 1
+        updated_class = class_repository.update(
+            replace(
+                group_class,
+                current_students=next_current_students,
+                status=_status_after_enrollment(group_class, next_current_students),
+                updated_at=now,
+            )
+        )
     else:
         updated_class = group_class
 

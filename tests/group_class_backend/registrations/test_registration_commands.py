@@ -86,6 +86,86 @@ def test_submit_enrollment_registration_creates_record_and_updates_student_count
     assert persisted_class.waitlist_count == 0
 
 
+def test_submit_enrollment_auto_marks_almost_confirmed_at_sixty_percent() -> None:
+    class_repository = InMemoryClassRepository()
+    registration_repository = InMemoryRegistrationRepository()
+    response = create_class_draft(
+        payload={"className": "自动状态课", "minStudents": 3, "maxStudents": 6},
+        repository=class_repository,
+        audit_writer=NullAuditWriter(),
+        request_id="req-seed-auto-status-001",
+        actor_id="admin-001",
+        now=datetime(2026, 4, 12, 12, 0, tzinfo=timezone.utc),
+    )
+    class_id = response["data"]["classId"]
+    current = class_repository.get(class_id)
+    assert current is not None
+    class_repository.update(replace(current, status=ClassStatus.OPEN_FOR_ENROLLMENT, current_students=4))
+
+    result = submit_registration(
+        payload={
+            "classId": class_id,
+            "registerType": "ENROLLMENT",
+            "parentName": "张女士",
+            "contactInfo": "13800000000",
+            "studentName": "张三",
+            "studentGrade": "三年级",
+        },
+        class_repository=class_repository,
+        registration_repository=registration_repository,
+        audit_writer=NullAuditWriter(),
+        request_id="req-registration-auto-almost-001",
+        actor_id="parent-001",
+        now=datetime(2026, 4, 12, 15, 0, tzinfo=timezone.utc),
+    )
+
+    persisted = class_repository.get(class_id)
+    assert persisted is not None
+    assert persisted.current_students == 5
+    assert persisted.status == ClassStatus.ALMOST_CONFIRMED
+    assert result["data"]["classStatus"] == "ALMOST_CONFIRMED"
+
+
+def test_submit_enrollment_auto_marks_full_at_capacity() -> None:
+    class_repository = InMemoryClassRepository()
+    registration_repository = InMemoryRegistrationRepository()
+    response = create_class_draft(
+        payload={"className": "自动满员课", "minStudents": 3, "maxStudents": 6},
+        repository=class_repository,
+        audit_writer=NullAuditWriter(),
+        request_id="req-seed-auto-full-001",
+        actor_id="admin-001",
+        now=datetime(2026, 4, 12, 12, 0, tzinfo=timezone.utc),
+    )
+    class_id = response["data"]["classId"]
+    current = class_repository.get(class_id)
+    assert current is not None
+    class_repository.update(replace(current, status=ClassStatus.OPEN_FOR_ENROLLMENT, current_students=5))
+
+    result = submit_registration(
+        payload={
+            "classId": class_id,
+            "registerType": "ENROLLMENT",
+            "parentName": "李女士",
+            "contactInfo": "13900000000",
+            "studentName": "李四",
+            "studentGrade": "四年级",
+        },
+        class_repository=class_repository,
+        registration_repository=registration_repository,
+        audit_writer=NullAuditWriter(),
+        request_id="req-registration-auto-full-001",
+        actor_id="parent-002",
+        now=datetime(2026, 4, 12, 15, 0, tzinfo=timezone.utc),
+    )
+
+    persisted = class_repository.get(class_id)
+    assert persisted is not None
+    assert persisted.current_students == 6
+    assert persisted.status == ClassStatus.FULL
+    assert result["data"]["classStatus"] == "FULL"
+
+
 def test_submit_waitlist_registration_creates_record_and_updates_waitlist_count() -> None:
     class_repository = InMemoryClassRepository()
     registration_repository = InMemoryRegistrationRepository()
