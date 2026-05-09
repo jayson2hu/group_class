@@ -546,6 +546,25 @@ export class ApiClient {
     return result.data || result;
   }
 
+  async exportAdminRegistrations() {
+    if (this.useMockData) {
+      const headers = ["registrationId", "classId", "className", "registerType", "registrationStatus", "parentName", "studentName", "studentGrade", "contactInfo", "submittedAt", "followUpNote", "notes"];
+      const rows = mockRegistrations.map((item) => headers.map((key) => `"${String(item[key] ?? "").replaceAll('"', '""')}"`).join(","));
+      return `${headers.join(",")}\n${rows.join("\n")}\n`;
+    }
+    const response = await fetch(`${this.baseUrl}/api/v1/admin/registrations/export`, {
+      headers: {
+        "X-Actor-Id": this.actorId,
+        "X-Actor-Roles": this.actorRoles.join(","),
+      },
+    });
+    const text = await response.text();
+    if (!response.ok) {
+      throw new Error(translateErrorMessage(text || `Request failed: ${response.status}`));
+    }
+    return text;
+  }
+
   async getAdminRegistrationDetail(registrationId) {
     if (this.useMockData) {
       const item = mockRegistrations.find((entry) => entry.registrationId === registrationId);

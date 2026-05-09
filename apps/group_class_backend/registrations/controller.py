@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import csv
 from dataclasses import replace
+from io import StringIO
 from uuid import uuid4
 
 from apps.group_class_backend.audit.interface import AuditEvent, AuditWriter
@@ -117,6 +119,27 @@ def _serialize_registration_list_item(registration: Registration, group_class: G
     }
 
 
+def _visible_registration_items(
+    *,
+    class_repository: InMemoryClassRepository | SQLiteClassRepository,
+    registration_repository: InMemoryRegistrationRepository | SQLiteRegistrationRepository,
+    actor_id: str,
+    actor_roles: list[str] | None,
+) -> list[dict[str, object]]:
+    visible_classes = {
+        group_class.class_id: group_class
+        for group_class in class_repository.list()
+        if _can_view_registration_class(group_class, actor_id=actor_id, actor_roles=actor_roles)
+    }
+    items = [
+        _serialize_registration_list_item(registration, visible_classes[registration.class_id])
+        for registration in registration_repository.list()
+        if registration.class_id in visible_classes
+    ]
+    items.sort(key=lambda item: str(item["submittedAt"]), reverse=True)
+    return items
+
+
 def _get_accessible_registration(
     *,
     registration_id: str,
@@ -198,17 +221,12 @@ def list_registrations(
             ],
         )
 
-    visible_classes = {
-        group_class.class_id: group_class
-        for group_class in class_repository.list()
-        if _can_view_registration_class(group_class, actor_id=actor_id, actor_roles=actor_roles)
-    }
-    all_items = [
-        _serialize_registration_list_item(registration, visible_classes[registration.class_id])
-        for registration in registration_repository.list()
-        if registration.class_id in visible_classes
-    ]
-    all_items.sort(key=lambda item: str(item["submittedAt"]), reverse=True)
+    all_items = _visible_registration_items(
+        class_repository=class_repository,
+        registration_repository=registration_repository,
+        actor_id=actor_id,
+        actor_roles=actor_roles,
+    )
     start = max(page - 1, 0) * page_size
     end = start + page_size
     return success_response(
@@ -220,6 +238,54 @@ def list_registrations(
             "items": all_items[start:end],
         },
     )
+
+
+def export_registrations_csv(
+    *,
+    class_repository: InMemoryClassRepository | SQLiteClassRepository,
+    registration_repository: InMemoryRegistrationRepository | SQLiteRegistrationRepository,
+    request_id: str,
+    actor_id: str,
+    actor_roles: list[str] | None = None,
+) -> dict[str, object]:
+    if not _actor_has_any_role(actor_roles, _BACKOFFICE_VIEW_ROLES):
+        return error_response(
+            request_id=request_id,
+            code=ErrorCode.PERMISSION_DENIED,
+            details=[
+                {
+                    "field": "actorRoles",
+                    "message": "only CLASS_ADMIN, SUPER_ADMIN, or INITIATOR can view registration data",
+                }
+            ],
+        )
+
+    fieldnames = [
+        "registrationId",
+        "classId",
+        "className",
+        "registerType",
+        "registrationStatus",
+        "parentName",
+        "studentName",
+        "studentGrade",
+        "contactInfo",
+        "submittedAt",
+        "followUpNote",
+        "notes",
+    ]
+    output = StringIO()
+    writer = csv.DictWriter(output, fieldnames=fieldnames, extrasaction="ignore")
+    writer.writeheader()
+    writer.writerows(
+        _visible_registration_items(
+            class_repository=class_repository,
+            registration_repository=registration_repository,
+            actor_id=actor_id,
+            actor_roles=actor_roles,
+        )
+    )
+    return success_response(request_id=request_id, data={"csv": output.getvalue()})
 
 
 def get_registration_detail(

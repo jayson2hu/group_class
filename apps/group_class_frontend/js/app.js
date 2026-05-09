@@ -963,12 +963,38 @@ async function renderAdminRegistrations(queryParams = new URLSearchParams()) {
         <div class="summary-pill"><span class="summary-label">报名总数</span><strong class="summary-value">${total}</strong></div>
         <div class="summary-pill"><span class="summary-label">报名</span><strong class="summary-value">${summary.ENROLLMENT}</strong></div>
         <div class="summary-pill"><span class="summary-label">候补</span><strong class="summary-value">${summary.WAITLIST}</strong></div>
-        <div class="summary-pill"><span class="summary-label">试听</span><strong class="summary-value">${summary.TRIAL}</strong></div>
+        <div class="summary-pill"><button id="registration-export-btn" type="button" class="btn primary">导出 CSV</button></div>
       </div>
     </section>
     <section class="grid registration-card-grid">${cards}</section>
     ${paginationHtml("#/admin/registrations", page, LIST_PAGE_SIZE, total)}
   `);
+  bindRegistrationExport();
+}
+
+function bindRegistrationExport() {
+  const button = document.getElementById("registration-export-btn");
+  if (!button) return;
+  button.addEventListener("click", async () => {
+    const restore = setButtonLoading(button, "导出中...");
+    try {
+      const csv = await api.exportAdminRegistrations();
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `registrations_${new Date().toISOString().replace(/[-:T]/g, "").slice(0, 14)}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      showToast("CSV 已导出", "success");
+      restore();
+    } catch (error) {
+      showToast(error.message || "导出失败", "error");
+      restore();
+    }
+  });
 }
 
 function bindRegistrationDetail(registrationId) {

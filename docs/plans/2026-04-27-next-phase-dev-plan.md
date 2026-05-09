@@ -12,13 +12,13 @@ Depends on: docs/plans/2026-04-14-gap-analysis.md（P0-Critical 已全部完成�
 
 ### 已完成（截至 2026-04-28）
 
-**后端 API（139 tests passed）**
-- FastAPI routers 已覆盖 classes CRUD、审核流、课程取消、注册 CRUD、模板 CRUD
+**后端 API（141 tests passed）**
+- FastAPI routers 已覆盖 classes CRUD、审核流、课程取消、注册 CRUD、报名导出、模板 CRUD
 - 两套仓储：InMemory（运行态）+ SQLite（测试用）
 - 权限模型：INITIATOR / CLASS_ADMIN / SUPER_ADMIN
 - AuditWriter（NullAuditWriter，结构已定，未持久化）
 
-**前端（app.js 1098行，api.js 639行）**
+**前端（app.js 1124行，api.js 658行）**
 - 前台：看板、详情、报名表单（ENROLLMENT/WAITLIST/TRIAL）、报名成功页、底部 FAQ
 - 后台：课程列表、创建、编辑、详情（含审核）、模板列表/创建/编辑、报名列表、报名详情（含备注+状态）
 - 交互：Toast 通知、空/错误状态统一、角色切换（家长/管理员）、路由守卫
@@ -47,7 +47,7 @@ Depends on: docs/plans/2026-04-14-gap-analysis.md（P0-Critical 已全部完成�
 |---|---|---|---|
 | H1 | 模板 CRUD 后端接口 | 后端 | ✅ 已完成 |
 | H2 | 模板管理前端页面 | 前端 | ✅ 已完成 |
-| H3 | 报名导出（CSV） | 后端 + 前端 | ⬜ 待开始 |
+| H3 | 报名导出（CSV） | 后端 + 前端 | ✅ 已完成 |
 | H4 | 课程筛选 / 搜索 | 后端 + 前端 | ⬜ 待开始 |
 | H5 | 自动状态计算（60% 成班规则） | 后端 | ⬜ 待开始 |
 | H6 | 候补转正流程 | 后端 + 前端 | ⬜ 待开始 |
@@ -323,6 +323,13 @@ PRD 7.3 要求报名成功页展示「课程当前状态」，以便家长了解
 **后端**：新增 `GET /api/v1/admin/registrations/export`，身份通过 `X-Actor-Id` / `X-Actor-Roles` Header 传递，响应 `Content-Type: text/csv`，文件名为 `registrations_{timestamp}.csv`。  
 **前端**：报名列表页 hero 区新增「导出 CSV」按钮，点击触发下载。  
 **验收**：下载的 CSV 文件包含所有可见报名记录，字段与列表页一致。
+
+**完成记录（2026-04-28）**
+
+- 后端新增 `export_registrations_csv()`，复用报名列表权限和可见范围，使用 `csv.DictWriter` 输出 CSV
+- 新增 `GET /api/v1/admin/registrations/export`，返回 `text/csv` 与 `Content-Disposition` 附件文件名
+- 前端报名列表新增「导出 CSV」按钮，真实模式和 mock 模式均可下载
+- 自测：报名 API 专项 `16 passed`；`node --check api.js/app.js` 通过；`uv run pytest tests/ -q` -> `141 passed`
 
 ---
 

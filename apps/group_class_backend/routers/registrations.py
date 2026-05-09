@@ -4,11 +4,13 @@ from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import APIRouter, Body, Depends, Query, Response
+from fastapi.responses import PlainTextResponse
 
 from apps.group_class_backend.app import get_state, new_request_id
 from apps.group_class_backend.common.error_codes import ErrorCode
 from apps.group_class_backend.deps import ActorContext, get_actor
 from apps.group_class_backend.registrations.controller import (
+    export_registrations_csv,
     get_registration_detail,
     list_registrations,
     submit_registration,
@@ -77,6 +79,30 @@ def admin_list_registrations(
     )
     response.status_code = _http_status(result)
     return result
+
+
+@router.get("/api/v1/admin/registrations/export")
+def admin_export_registrations(
+    actor: ActorContext = Depends(get_actor),
+) -> PlainTextResponse:
+    state = get_state()
+    now = datetime.now(timezone.utc)
+    result = export_registrations_csv(
+        class_repository=state.class_repository,
+        registration_repository=state.registration_repository,
+        request_id=new_request_id(),
+        actor_id=actor.actor_id,
+        actor_roles=actor.actor_roles,
+    )
+    status_code = _http_status(result)
+    if status_code != 200:
+        return PlainTextResponse(str(result.get("details", result.get("code", "export failed"))), status_code=status_code)
+    filename = f"registrations_{now.strftime('%Y%m%d%H%M%S')}.csv"
+    return PlainTextResponse(
+        str(result["data"]["csv"]),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @router.get("/api/v1/admin/registrations/{registration_id}")
