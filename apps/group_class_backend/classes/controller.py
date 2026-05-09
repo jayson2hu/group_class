@@ -758,10 +758,22 @@ def list_classes(
     page: int,
     page_size: int,
     public_only: bool = False,
+    status_filter: list[str] | None = None,
+    creator_id_filter: str | None = None,
+    keyword: str | None = None,
 ) -> dict[str, object]:
     all_items = sorted(repository.list(), key=lambda item: item.updated_at, reverse=True)
     if public_only:
         all_items = [item for item in all_items if item.status in _PUBLIC_VISIBLE_STATUSES]
+    if status_filter:
+        allowed_statuses = {status for status in status_filter if status}
+        all_items = [item for item in all_items if item.status.value in allowed_statuses]
+    if creator_id_filter:
+        all_items = [item for item in all_items if item.creator_id == creator_id_filter]
+    if keyword:
+        normalized_keyword = keyword.strip().lower()
+        if normalized_keyword:
+            all_items = [item for item in all_items if normalized_keyword in (item.class_name or "").lower()]
     start = max(page - 1, 0) * page_size
     end = start + page_size
     serialized_items = []

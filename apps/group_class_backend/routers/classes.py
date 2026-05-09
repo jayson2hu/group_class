@@ -40,6 +40,13 @@ def _effective_page_size(page_size: int, page_size_camel: int | None) -> int:
     return min(page_size_camel if page_size_camel is not None else page_size, 100)
 
 
+def _normalize_status_filter(status: list[str] | None) -> list[str]:
+    values: list[str] = []
+    for entry in status or []:
+        values.extend(part.strip() for part in entry.split(",") if part.strip())
+    return values
+
+
 @router.get("/api/v1/public/classes")
 def public_list_classes(
     response: Response,
@@ -78,6 +85,9 @@ def admin_list_classes(
     page: int = 1,
     page_size: int = 20,
     page_size_camel: int | None = Query(default=None, alias="pageSize"),
+    status: list[str] | None = Query(default=None),
+    creator_id: str | None = Query(default=None, alias="creatorId"),
+    keyword: str | None = None,
 ) -> dict[str, object]:
     state = get_state()
     result = list_classes(
@@ -86,6 +96,9 @@ def admin_list_classes(
         page=page,
         page_size=_effective_page_size(page_size, page_size_camel),
         public_only=False,
+        status_filter=_normalize_status_filter(status),
+        creator_id_filter=creator_id,
+        keyword=keyword,
     )
     response.status_code = _http_status(result)
     return result

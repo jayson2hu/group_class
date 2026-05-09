@@ -96,8 +96,39 @@ def test_admin_list_contains_draft_class(client):
     assert "DRAFT" in statuses
 
 
+def test_admin_list_filters_by_status(client):
+    """TC-C07: 后台课程列表支持按状态筛选。"""
+
+    response = client.get("/api/v1/admin/classes?status=DRAFT")
+
+    data = response.json()["data"]
+    assert data["total"] >= 1
+    assert {item["status"] for item in data["items"]} == {"DRAFT"}
+
+
+def test_admin_list_filters_by_keyword(client, initiator_headers):
+    """TC-C08: 后台课程列表支持按课程名关键词搜索。"""
+
+    created = _create_class(client, initiator_headers, "关键词筛选专用课")
+    response = client.get("/api/v1/admin/classes?keyword=关键词筛选")
+
+    data = response.json()["data"]
+    assert data["total"] == 1
+    assert data["items"][0]["classId"] == created["classId"]
+
+
+def test_admin_list_filters_by_creator_id(client, initiator_headers):
+    """TC-C09: 后台课程列表支持按发起人筛选。"""
+
+    created = _create_class(client, initiator_headers, "发起人筛选专用课")
+    response = client.get(f"/api/v1/admin/classes?creatorId={initiator_headers['X-Actor-Id']}")
+
+    class_ids = {item["classId"] for item in response.json()["data"]["items"]}
+    assert created["classId"] in class_ids
+
+
 def test_create_class_returns_draft_version_one(client, initiator_headers):
-    """TC-C07: 创建课程成功，返回 DRAFT 状态，version=1。"""
+    """TC-C10: 创建课程成功，返回 DRAFT 状态，version=1。"""
 
     data = _create_class(client, initiator_headers)
 

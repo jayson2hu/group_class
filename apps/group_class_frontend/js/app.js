@@ -173,11 +173,32 @@ function readPage(queryParams) {
   return Number.isFinite(page) && page > 0 ? Math.floor(page) : 1;
 }
 
+function readClassFilters(queryParams) {
+  return {
+    status: queryParams.getAll("status").flatMap((value) => value.split(",").map((entry) => entry.trim()).filter(Boolean)),
+    creatorId: queryParams.get("creatorId") || "",
+    keyword: queryParams.get("keyword") || "",
+  };
+}
+
+function classFilterHtml(filters) {
+  const statuses = ["DRAFT", "PENDING_REVIEW", "REJECTED", "OPEN_FOR_ENROLLMENT", "ALMOST_CONFIRMED", "CONFIRMED", "FULL", "WAITLIST_OPEN", "IN_PROGRESS", "CANCELLED"];
+  return `
+    <form id="admin-class-filter-form" class="panel filter-bar">
+      <div class="row"><label>状态</label><select name="status"><option value="">全部状态</option>${statuses.map((status) => `<option value="${status}" ${filters.status.includes(status) ? "selected" : ""}>${classStatusLabel(status)}</option>`).join("")}</select></div>
+      <div class="row"><label>关键词</label><input name="keyword" value="${filters.keyword}" placeholder="按课程名称搜索" /></div>
+      <div class="row"><label>发起人 ID</label><input name="creatorId" value="${filters.creatorId}" placeholder="可选" /></div>
+      <div class="actions filter-actions"><button type="submit" class="primary">筛选</button><a class="btn" href="#/admin/classes">重置</a></div>
+    </form>
+  `;
+}
+
 function paginationHtml(baseHash, page, pageSize, total) {
   const totalPages = Math.max(1, Math.ceil((total || 0) / pageSize));
   if (totalPages <= 1) return "";
-  const prev = page > 1 ? `<a class="btn pagination-btn" href="${baseHash}?page=${page - 1}">&lt; 上一页</a>` : '<span class="pagination-spacer"></span>';
-  const next = page < totalPages ? `<a class="btn pagination-btn" href="${baseHash}?page=${page + 1}">下一页 &gt;</a>` : '<span class="pagination-spacer"></span>';
+  const separator = baseHash.includes("?") ? "&" : "?";
+  const prev = page > 1 ? `<a class="btn pagination-btn" href="${baseHash}${separator}page=${page - 1}">&lt; 上一页</a>` : '<span class="pagination-spacer"></span>';
+  const next = page < totalPages ? `<a class="btn pagination-btn" href="${baseHash}${separator}page=${page + 1}">下一页 &gt;</a>` : '<span class="pagination-spacer"></span>';
   return `
     <nav class="pagination-bar" aria-label="分页">
       ${prev}
@@ -185,6 +206,23 @@ function paginationHtml(baseHash, page, pageSize, total) {
       ${next}
     </nav>
   `;
+}
+
+function bindAdminClassFilters() {
+  const form = document.getElementById("admin-class-filter-form");
+  if (!form) return;
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const fd = new FormData(form);
+    const params = new URLSearchParams();
+    const status = String(fd.get("status") || "").trim();
+    const keyword = String(fd.get("keyword") || "").trim();
+    const creatorId = String(fd.get("creatorId") || "").trim();
+    if (status) params.set("status", status);
+    if (keyword) params.set("keyword", keyword);
+    if (creatorId) params.set("creatorId", creatorId);
+    window.location.hash = params.toString() ? `#/admin/classes?${params.toString()}` : "#/admin/classes";
+  });
 }
 
 function parseIsoOrNull(value) {
@@ -899,11 +937,16 @@ function bindAdminClassQuickActions() {
 
 async function renderAdminClasses(queryParams = new URLSearchParams()) {
   const page = readPage(queryParams);
-  const result = await api.getAdminClasses(page, LIST_PAGE_SIZE);
+  const filters = readClassFilters(queryParams);
+  const result = await api.getAdminClasses(page, LIST_PAGE_SIZE, filters);
   const items = result.items || [];
   const total = result.total ?? items.length;
+  const pageParams = new URLSearchParams(queryParams);
+  pageParams.delete("page");
+  const pageBaseHash = pageParams.toString() ? `#/admin/classes?${pageParams.toString()}` : "#/admin/classes";
   if (!items.length) {
-    setHtml(`<section class="panel admin-hero"><div><p class="section-kicker">Admin Classes</p><h2>课程管理列表</h2></div></section>${emptyStateHtml("暂无课程", "当前后台没有课程记录。")}`);
+    setHtml(`<section class="panel admin-hero"><div><p class="section-kicker">Admin Classes</p><h2>课程管理列表</h2></div></section>${classFilterHtml(filters)}${emptyStateHtml("暂无课程", "当前条件下没有课程记录。")}`);
+    bindAdminClassFilters();
     return;
   }
   const cards = items.map((item) => {
@@ -927,9 +970,11 @@ async function renderAdminClasses(queryParams = new URLSearchParams()) {
       <div><p class="section-kicker">Admin Classes</p><h2>课程管理列表</h2><p class="muted admin-hero-text">集中查看课程状态、人数、截止时间与可操作动作。</p></div>
       <div class="admin-summary-grid"><div class="summary-pill"><span class="summary-label">课程总数</span><strong class="summary-value">${total}</strong></div><div class="summary-pill"><a class="btn primary" href="#/admin/classes/new">新建课程</a></div></div>
     </section>
+    ${classFilterHtml(filters)}
     <section id="admin-class-action-list" class="grid admin-class-grid">${cards}</section>
-    ${paginationHtml("#/admin/classes", page, LIST_PAGE_SIZE, total)}
+    ${paginationHtml(pageBaseHash, page, LIST_PAGE_SIZE, total)}
   `);
+  bindAdminClassFilters();
   bindAdminClassQuickActions();
 }
 

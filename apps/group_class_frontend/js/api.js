@@ -178,8 +178,15 @@ export function translateErrorMessage(message) {
   return ERROR_MAP[message] || message;
 }
 
-function buildPagedUrl(baseUrl, page, pageSize) {
+function buildPagedUrl(baseUrl, page, pageSize, extraParams = {}) {
   const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
+  Object.entries(extraParams).forEach(([key, value]) => {
+    if (Array.isArray(value)) {
+      value.filter(Boolean).forEach((entry) => params.append(key, entry));
+    } else if (value !== undefined && value !== null && value !== "") {
+      params.set(key, String(value));
+    }
+  });
   return `${baseUrl}?${params.toString()}`;
 }
 
@@ -291,9 +298,17 @@ export class ApiClient {
     return result.data || result;
   }
 
-  async getAdminClasses(page = 1, pageSize = 20) {
+  async getAdminClasses(page = 1, pageSize = 20, filters = {}) {
     if (this.useMockData) {
-      const items = mockClasses.map((item) => ({
+      let source = [...mockClasses];
+      if (filters.status?.length) {
+        source = source.filter((item) => filters.status.includes(item.status));
+      }
+      if (filters.keyword) {
+        const keyword = String(filters.keyword).toLowerCase();
+        source = source.filter((item) => (item.className || "").toLowerCase().includes(keyword));
+      }
+      const items = source.map((item) => ({
         classId: item.classId,
         className: item.className,
         classType: item.classType,
@@ -308,7 +323,7 @@ export class ApiClient {
       }));
       return toPageResult(items, page, pageSize);
     }
-    const result = await requestJson(buildPagedUrl(`${this.baseUrl}/api/v1/admin/classes`, page, pageSize), {}, this.actorId, this.actorRoles);
+    const result = await requestJson(buildPagedUrl(`${this.baseUrl}/api/v1/admin/classes`, page, pageSize, filters), {}, this.actorId, this.actorRoles);
     return result.data || result;
   }
 
