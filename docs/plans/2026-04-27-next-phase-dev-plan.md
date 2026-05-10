@@ -18,7 +18,7 @@ Depends on: docs/plans/2026-04-14-gap-analysis.md（P0-Critical 已全部完成�
 - 权限模型：INITIATOR / CLASS_ADMIN / SUPER_ADMIN
 - AuditWriter（NullAuditWriter，结构已定，未持久化）
 
-**前端（app.js 1196行，api.js 695行）**
+**前端（app.js 1238行，api.js 695行）**
 - 前台：看板、详情、报名表单（ENROLLMENT/WAITLIST/TRIAL）、报名成功页、底部 FAQ
 - 后台：课程列表、创建、编辑、详情（含审核）、模板列表/创建/编辑、报名列表、报名详情（含备注+状态）
 - 交互：Toast 通知、空/错误状态统一、角色切换（家长/管理员）、路由守卫
@@ -52,7 +52,7 @@ Depends on: docs/plans/2026-04-14-gap-analysis.md（P0-Critical 已全部完成�
 | H5 | 自动状态计算（60% 成班规则） | 后端 | ✅ 已完成 |
 | H6 | 候补转正流程 | 后端 + 前端 | ✅ 已完成 |
 | H7 | 课程封面 / 亮点 / 负责人字段 | 后端 + 前端 | ✅ 已完成 |
-| H8 | 分享链接（复制到剪贴板） | 前端 | ⬜ 待开始 |
+| H8 | 分享链接（复制到剪贴板） | 前端 | ✅ 已完成 |
 
 ### P2（业务闭环，暂不纳入）
 
@@ -399,6 +399,12 @@ PRD 7.3 要求报名成功页展示「课程当前状态」，以便家长了解
 **前端**：前台课程详情页右侧侧栏新增「复制分享链接」按钮，点击后将当前 URL 写入剪贴板（`navigator.clipboard.writeText`），toast 提示「链接已复制」。  
 **降级**：若 clipboard API 不可用（HTTP 环境），展示输入框让用户手动复制。  
 **验收**：HTTPS 环境下点击后 toast 提示，粘贴内容为课程详情页 URL。
+
+**完成记录（2026-05-09）**
+
+- 前台课程详情页右侧新增「复制分享链接」按钮
+- 优先使用 `navigator.clipboard.writeText`，不可用或失败时展示当前 URL 供手动复制
+- 自测：`node --check api.js/app.js` 通过；`uv run pytest tests/ -q` -> `149 passed`
 
 ---
 

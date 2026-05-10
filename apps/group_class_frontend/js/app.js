@@ -241,6 +241,22 @@ function setButtonLoading(button, text) {
   };
 }
 
+async function copyText(text) {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(text);
+    return true;
+  }
+  const input = document.createElement("input");
+  input.value = text;
+  input.setAttribute("readonly", "readonly");
+  input.className = "sr-only-copy-input";
+  document.body.appendChild(input);
+  input.select();
+  const copied = document.execCommand("copy");
+  input.remove();
+  return copied;
+}
+
 function actionTag(action, classId) {
   if (["submit_review", "approve", "reject", "cancel"].includes(action)) {
     const extraClass = action === "cancel" ? " action-tag-danger" : "";
@@ -383,6 +399,8 @@ async function renderPublicDetail(classId) {
             <div><dt>开课周期</dt><dd>${formatDateRange(detail.startDate, detail.endDate)}</dd></div>
             <div><dt>成班门槛</dt><dd>${minStudents} 人开班，最多 ${maxStudents} 人</dd></div>
           </dl>
+          <button id="copy-share-link-btn" type="button" class="btn primary share-link-btn">复制分享链接</button>
+          <p id="manual-share-link" class="muted manual-share-link" hidden>${window.location.href}</p>
         </div>
       </aside>
     </section>
@@ -414,6 +432,30 @@ async function renderPublicDetail(classId) {
       </div>
     </section>
   `);
+  bindShareLinkButton();
+}
+
+function bindShareLinkButton() {
+  const button = document.getElementById("copy-share-link-btn");
+  const fallback = document.getElementById("manual-share-link");
+  if (!button) return;
+  button.addEventListener("click", async () => {
+    const url = window.location.href;
+    try {
+      const copied = await copyText(url);
+      if (copied) {
+        showToast("链接已复制", "success");
+        return;
+      }
+    } catch {
+      // Fall through to manual fallback.
+    }
+    if (fallback) {
+      fallback.hidden = false;
+      fallback.textContent = url;
+    }
+    showToast("请手动复制链接", "info");
+  });
 }
 
 function enrollmentFormHtml(classId, registerType = "ENROLLMENT") {
