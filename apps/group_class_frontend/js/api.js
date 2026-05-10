@@ -650,6 +650,28 @@ export class ApiClient {
     return result.data || result;
   }
 
+  async promoteWaitlistRegistration(registrationId) {
+    if (this.useMockData) {
+      const index = mockRegistrations.findIndex((entry) => entry.registrationId === registrationId);
+      if (index === -1) {
+        throw new Error("registration not found");
+      }
+      mockRegistrations[index] = {
+        ...mockRegistrations[index],
+        registrationStatus: "VALID",
+        updatedAt: new Date().toISOString(),
+      };
+      return mockRegistrations[index];
+    }
+    const result = await requestJson(
+      `${this.baseUrl}/api/v1/admin/registrations/${registrationId}/promote-from-waitlist`,
+      { method: "POST" },
+      this.actorId,
+      this.actorRoles
+    );
+    return result.data || result;
+  }
+
   mockReviewStatus(classId, version, status) {
     const index = mockClasses.findIndex((entry) => entry.classId === classId);
     if (index === -1) {

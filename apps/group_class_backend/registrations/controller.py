@@ -429,6 +429,72 @@ def update_registration_status(
     return success_response(request_id=request_id, data=_serialize_registration_detail(updated_registration, group_class))
 
 
+def promote_waitlist_registration(
+    *,
+    registration_id: str,
+    class_repository: InMemoryClassRepository | SQLiteClassRepository,
+    registration_repository: InMemoryRegistrationRepository | SQLiteRegistrationRepository,
+    audit_writer: AuditWriter,
+    request_id: str,
+    actor_id: str,
+    actor_roles: list[str] | None = None,
+    now,
+) -> dict[str, object]:
+    registration, group_class, error = _get_accessible_registration(
+        registration_id=registration_id,
+        class_repository=class_repository,
+        registration_repository=registration_repository,
+        request_id=request_id,
+        actor_id=actor_id,
+        actor_roles=actor_roles,
+    )
+    if error is not None:
+        return error
+
+    if not _actor_has_any_role(actor_roles, _ALLOWED_STATUS_UPDATE_ROLES):
+        return error_response(
+            request_id=request_id,
+            code=ErrorCode.PERMISSION_DENIED,
+            details=[
+                {
+                    "field": "actorRoles",
+                    "message": "only CLASS_ADMIN, SUPER_ADMIN, or INITIATOR can promote waitlist registrations",
+                }
+            ],
+        )
+    if registration.registration_type != RegistrationType.WAITLIST or registration.status != RegistrationStatus.WAITLISTED:
+        return error_response(
+            request_id=request_id,
+            code=ErrorCode.VALIDATION_INVALID_ARGUMENT,
+            details=[{"field": "registrationId", "message": "only WAITLISTED waitlist registrations can be promoted"}],
+        )
+
+    updated_class = class_repository.update(
+        replace(
+            group_class,
+            current_students=group_class.current_students + 1,
+            waitlist_count=max(group_class.waitlist_count - 1, 0),
+            updated_at=now,
+        )
+    )
+    updated_registration = registration_repository.update(replace(registration, status=RegistrationStatus.VALID, updated_at=now))
+    audit_writer.record(
+        AuditEvent(
+            request_id=request_id,
+            actor_id=actor_id,
+            action="registration.waitlist_promoted",
+            resource_type="registration",
+            resource_id=registration.registration_id,
+            metadata={
+                "classId": group_class.class_id,
+                "currentStudents": updated_class.current_students,
+                "waitlistCount": updated_class.waitlist_count,
+            },
+        )
+    )
+    return success_response(request_id=request_id, data=_serialize_registration_detail(updated_registration, updated_class))
+
+
 def submit_registration(
     *,
     payload: dict[str, object],

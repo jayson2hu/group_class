@@ -199,8 +199,37 @@ def test_admin_registration_export_without_role_returns_403(client):
     assert response.status_code == 403
 
 
+def test_promote_waitlist_registration_success(client, public_headers, admin_headers):
+    """TC-R12: 候补转正成功，课程人数和候补数联动。"""
+
+    class_id = _public_class_id(client, "FULL")
+    before = client.get(f"/api/v1/admin/classes/{class_id}").json()["data"]
+    submitted = client.post(
+        "/api/v1/public/registrations",
+        json={
+            "classId": class_id,
+            "registerType": "WAITLIST",
+            "parentName": "李四",
+            "contactInfo": "13900139000",
+            "studentGrade": "四年级",
+        },
+        headers=public_headers,
+    ).json()["data"]
+
+    response = client.post(
+        f"/api/v1/admin/registrations/{submitted['registrationId']}/promote-from-waitlist",
+        headers=admin_headers,
+    )
+    after = client.get(f"/api/v1/admin/classes/{class_id}").json()["data"]
+
+    assert response.status_code == 200
+    assert response.json()["data"]["registrationStatus"] == "VALID"
+    assert after["currentStudents"] == before["currentStudents"] + 1
+    assert after["waitlistCount"] == before["waitlistCount"]
+
+
 def test_registration_detail_contains_core_fields(client, approved_class_id, public_headers, admin_headers):
-    """TC-R12: 报名详情字段完整。"""
+    """TC-R13: 报名详情字段完整。"""
 
     registration = _submit_enrollment(client, approved_class_id, public_headers)
     response = client.get(f"/api/v1/admin/registrations/{registration['registrationId']}", headers=admin_headers)
@@ -212,7 +241,7 @@ def test_registration_detail_contains_core_fields(client, approved_class_id, pub
 
 
 def test_update_notes_persists(client, approved_class_id, public_headers, admin_headers):
-    """TC-R13: 更新备注成功，字段持久化。"""
+    """TC-R14: 更新备注成功，字段持久化。"""
 
     registration = _submit_enrollment(client, approved_class_id, public_headers)
     registration_id = registration["registrationId"]
@@ -229,7 +258,7 @@ def test_update_notes_persists(client, approved_class_id, public_headers, admin_
 
 
 def test_update_status_valid_success(client, approved_class_id, public_headers, admin_headers):
-    """TC-R14: 更新状态为 VALID 成功。"""
+    """TC-R15: 更新状态为 VALID 成功。"""
 
     registration = _submit_enrollment(client, approved_class_id, public_headers)
     response = client.post(
@@ -243,7 +272,7 @@ def test_update_status_valid_success(client, approved_class_id, public_headers, 
 
 
 def test_update_status_invalid_value_returns_400(client, approved_class_id, public_headers, admin_headers):
-    """TC-R15: 更新状态为非法值返回 400。"""
+    """TC-R16: 更新状态为非法值返回 400。"""
 
     registration = _submit_enrollment(client, approved_class_id, public_headers)
     response = client.post(
@@ -256,7 +285,7 @@ def test_update_status_invalid_value_returns_400(client, approved_class_id, publ
 
 
 def test_update_notes_without_role_returns_403(client, approved_class_id, public_headers):
-    """TC-R16: 无权限更新备注返回 403。"""
+    """TC-R17: 无权限更新备注返回 403。"""
 
     registration = _submit_enrollment(client, approved_class_id, public_headers)
     response = client.post(

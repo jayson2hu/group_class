@@ -12,13 +12,13 @@ Depends on: docs/plans/2026-04-14-gap-analysis.md（P0-Critical 已全部完成�
 
 ### 已完成（截至 2026-04-28）
 
-**后端 API（146 tests passed）**
+**后端 API（148 tests passed）**
 - FastAPI routers 已覆盖 classes CRUD、审核流、课程取消、注册 CRUD、报名导出、模板 CRUD
 - 两套仓储：InMemory（运行态）+ SQLite（测试用）
 - 权限模型：INITIATOR / CLASS_ADMIN / SUPER_ADMIN
 - AuditWriter（NullAuditWriter，结构已定，未持久化）
 
-**前端（app.js 1169行，api.js 673行）**
+**前端（app.js 1186行，api.js 695行）**
 - 前台：看板、详情、报名表单（ENROLLMENT/WAITLIST/TRIAL）、报名成功页、底部 FAQ
 - 后台：课程列表、创建、编辑、详情（含审核）、模板列表/创建/编辑、报名列表、报名详情（含备注+状态）
 - 交互：Toast 通知、空/错误状态统一、角色切换（家长/管理员）、路由守卫
@@ -50,7 +50,7 @@ Depends on: docs/plans/2026-04-14-gap-analysis.md（P0-Critical 已全部完成�
 | H3 | 报名导出（CSV） | 后端 + 前端 | ✅ 已完成 |
 | H4 | 课程筛选 / 搜索 | 后端 + 前端 | ✅ 已完成 |
 | H5 | 自动状态计算（60% 成班规则） | 后端 | ✅ 已完成 |
-| H6 | 候补转正流程 | 后端 + 前端 | ⬜ 待开始 |
+| H6 | 候补转正流程 | 后端 + 前端 | ✅ 已完成 |
 | H7 | 课程封面 / 亮点 / 负责人字段 | 后端 + 前端 | ⬜ 待开始 |
 | H8 | 分享链接（复制到剪贴板） | 前端 | ⬜ 待开始 |
 
@@ -369,6 +369,13 @@ PRD 7.3 要求报名成功页展示「课程当前状态」，以便家长了解
 **后端**：新增 `POST /api/v1/admin/registrations/{id}/promote-from-waitlist`，将候补报名状态改为 `VALID`，同时 `current_students + 1`，`waitlist_count - 1`。  
 **前端**：报名详情页，当 `registerType == WAITLIST && registrationStatus == WAITLISTED` 时显示「转为正式报名」按钮。  
 **验收**：转正后报名状态变 `VALID`，课程人数 +1，候补人数 -1。
+
+**完成记录（2026-05-09）**
+
+- 后端新增 `promote_waitlist_registration()` 与 `POST /api/v1/admin/registrations/{id}/promote-from-waitlist`
+- 转正后报名状态变 `VALID`，课程 `currentStudents + 1`，`waitlistCount - 1`
+- 前端报名详情页对 `WAITLISTED` 候补记录显示「转为正式报名」按钮
+- 自测：报名专项 `37 passed`；`node --check api.js/app.js` 通过；`uv run pytest tests/ -q` -> `148 passed`
 
 ---
 

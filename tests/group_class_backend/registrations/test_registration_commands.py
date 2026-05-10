@@ -11,6 +11,7 @@ from apps.group_class_backend.persistence.schema import apply_schema
 from apps.group_class_backend.registrations.controller import (
     get_registration_detail,
     list_registrations,
+    promote_waitlist_registration,
     submit_registration,
     update_registration_notes,
     update_registration_status,
@@ -201,6 +202,48 @@ def test_submit_waitlist_registration_creates_record_and_updates_waitlist_count(
     assert persisted_class is not None
     assert persisted_class.current_students == 0
     assert persisted_class.waitlist_count == 1
+
+
+def test_promote_waitlist_registration_updates_class_counts() -> None:
+    class_repository = InMemoryClassRepository()
+    registration_repository = InMemoryRegistrationRepository()
+    class_id = _seed_open_class(class_repository)
+    current = class_repository.get(class_id)
+    assert current is not None
+    class_repository.update(replace(current, status=ClassStatus.WAITLIST_OPEN))
+    waitlist = submit_registration(
+        payload={
+            "classId": class_id,
+            "registerType": "WAITLIST",
+            "parentName": "李女士",
+            "contactInfo": "13900000000",
+            "studentGrade": "四年级",
+        },
+        class_repository=class_repository,
+        registration_repository=registration_repository,
+        audit_writer=NullAuditWriter(),
+        request_id="req-registration-waitlist-promote-seed-001",
+        actor_id="parent-002",
+        now=datetime(2026, 4, 12, 15, 10, tzinfo=timezone.utc),
+    )["data"]
+
+    response = promote_waitlist_registration(
+        registration_id=waitlist["registrationId"],
+        class_repository=class_repository,
+        registration_repository=registration_repository,
+        audit_writer=NullAuditWriter(),
+        request_id="req-registration-waitlist-promote-001",
+        actor_id="admin-001",
+        actor_roles=["CLASS_ADMIN"],
+        now=datetime(2026, 4, 12, 16, 0, tzinfo=timezone.utc),
+    )
+
+    persisted_class = class_repository.get(class_id)
+    assert response["code"] == ErrorCode.OK
+    assert response["data"]["registrationStatus"] == "VALID"
+    assert persisted_class is not None
+    assert persisted_class.current_students == 1
+    assert persisted_class.waitlist_count == 0
 
 
 def test_submit_trial_registration_creates_record_without_incrementing_class_counts() -> None:

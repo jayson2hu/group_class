@@ -1045,6 +1045,7 @@ function bindRegistrationExport() {
 function bindRegistrationDetail(registrationId) {
   const noteForm = document.getElementById("registration-note-form");
   const statusForm = document.getElementById("registration-status-form");
+  const promoteButton = document.getElementById("registration-promote-btn");
   if (noteForm) noteForm.addEventListener("submit", async (event) => {
     event.preventDefault();
     const button = noteForm.querySelector("button[type='submit']");
@@ -1073,6 +1074,18 @@ function bindRegistrationDetail(registrationId) {
       restore();
     }
   });
+  if (promoteButton) promoteButton.addEventListener("click", async () => {
+    if (!window.confirm("确认将该候补转为正式报名？")) return;
+    const restore = setButtonLoading(promoteButton, "转正中...");
+    try {
+      await api.promoteWaitlistRegistration(registrationId);
+      showToast("候补已转正", "success");
+      await renderAdminRegistrationDetail(registrationId);
+    } catch (error) {
+      showToast(error.message || "候补转正失败", "error");
+      restore();
+    }
+  });
 }
 
 async function renderAdminRegistrationDetail(registrationId) {
@@ -1081,6 +1094,9 @@ async function renderAdminRegistrationDetail(registrationId) {
     setHtml(errorStateHtml("报名记录不存在", "#/admin/registrations"));
     return;
   }
+  const promoteButton = detail.registerType === "WAITLIST" && detail.registrationStatus === "WAITLISTED"
+    ? '<button id="registration-promote-btn" type="button" class="btn primary">转为正式报名</button>'
+    : "";
   setHtml(`
     <section class="panel admin-detail-hero">
       <div><p class="section-kicker">Registration Detail</p><h2>报名详情</h2><p class="muted detail-subtitle">报名编号：${detail.registrationId}</p></div>
@@ -1117,6 +1133,7 @@ async function renderAdminRegistrationDetail(registrationId) {
             <div class="row"><label>报名状态</label><select name="registrationStatus"><option value="VALID" ${detail.registrationStatus === "VALID" ? "selected" : ""}>有效</option><option value="INVALID" ${detail.registrationStatus === "INVALID" ? "selected" : ""}>无效</option><option value="CANCELLED" ${detail.registrationStatus === "CANCELLED" ? "selected" : ""}>已取消</option></select></div>
             <button type="submit" class="primary">更新状态</button>
           </form>
+          ${promoteButton ? `<div class="actions admin-detail-actions">${promoteButton}</div>` : ""}
           <div class="actions admin-detail-actions"><a class="btn" href="#/admin/registrations">返回报名列表</a></div>
         </section>
       </aside>

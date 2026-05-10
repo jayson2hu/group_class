@@ -13,6 +13,7 @@ from apps.group_class_backend.registrations.controller import (
     export_registrations_csv,
     get_registration_detail,
     list_registrations,
+    promote_waitlist_registration,
     submit_registration,
     update_registration_notes,
     update_registration_status,
@@ -157,6 +158,27 @@ def admin_update_registration_status(
     result = update_registration_status(
         registration_id=registration_id,
         payload=body,
+        class_repository=state.class_repository,
+        registration_repository=state.registration_repository,
+        audit_writer=state.audit_writer,
+        request_id=new_request_id(),
+        actor_id=actor.actor_id,
+        actor_roles=actor.actor_roles,
+        now=datetime.now(timezone.utc),
+    )
+    response.status_code = _http_status(result)
+    return result
+
+
+@router.post("/api/v1/admin/registrations/{registration_id}/promote-from-waitlist")
+def admin_promote_waitlist_registration(
+    registration_id: str,
+    response: Response,
+    actor: ActorContext = Depends(get_actor),
+) -> dict[str, object]:
+    state = get_state()
+    result = promote_waitlist_registration(
+        registration_id=registration_id,
         class_repository=state.class_repository,
         registration_repository=state.registration_repository,
         audit_writer=state.audit_writer,
