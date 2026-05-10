@@ -137,6 +137,29 @@ def test_create_class_returns_draft_version_one(client, initiator_headers):
     assert data["classId"].startswith("cls-")
 
 
+def test_create_class_supports_marketing_fields(client, initiator_headers):
+    """TC-C11: 创建课程支持封面、亮点、负责人字段。"""
+
+    response = client.post(
+        "/api/v1/admin/classes",
+        json={
+            "className": "营销字段课",
+            "minStudents": 3,
+            "maxStudents": 10,
+            "coverImageUrl": "https://example.com/cover.jpg",
+            "highlights": "小班授课\n阅读强化",
+            "ownerId": "owner-001",
+        },
+        headers=initiator_headers,
+    )
+
+    data = response.json()["data"]
+    assert response.status_code == 200
+    assert data["coverImageUrl"] == "https://example.com/cover.jpg"
+    assert data["highlights"] == "小班授课\n阅读强化"
+    assert data["ownerId"] == "owner-001"
+
+
 def test_create_class_uses_actor_id_header(client, initiator_headers):
     """TC-C06: 创建课程，creatorId 来自 X-Actor-Id Header。"""
 

@@ -40,11 +40,11 @@ class SQLiteClassRepository:
             INSERT INTO classes (
                 class_id, version, creator_id, class_name, template_id, status, reviewer_id, class_type,
                 price_amount, deposit_amount, min_students, max_students,
-                current_students, waitlist_count, course_subtitle, target_audience, unsuitable_audience,
-                course_goal, schedule_summary, session_count, group_rule, absence_rule, waitlist_rule,
-                failure_rule, faq_summary, start_date, end_date,
+                current_students, waitlist_count, course_subtitle, cover_image_url, highlights, owner_id,
+                target_audience, unsuitable_audience, course_goal, schedule_summary, session_count,
+                group_rule, absence_rule, waitlist_rule, failure_rule, faq_summary, start_date, end_date,
                 signup_deadline, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             self._to_row(group_class),
         )
@@ -75,9 +75,9 @@ class SQLiteClassRepository:
             UPDATE classes
             SET version = ?, creator_id = ?, class_name = ?, template_id = ?, status = ?, reviewer_id = ?, class_type = ?,
                 price_amount = ?, deposit_amount = ?, min_students = ?, max_students = ?,
-                current_students = ?, waitlist_count = ?, course_subtitle = ?, target_audience = ?, unsuitable_audience = ?,
-                course_goal = ?, schedule_summary = ?, session_count = ?, group_rule = ?, absence_rule = ?, waitlist_rule = ?,
-                failure_rule = ?, faq_summary = ?, start_date = ?, end_date = ?,
+                current_students = ?, waitlist_count = ?, course_subtitle = ?, cover_image_url = ?, highlights = ?, owner_id = ?,
+                target_audience = ?, unsuitable_audience = ?, course_goal = ?, schedule_summary = ?, session_count = ?,
+                group_rule = ?, absence_rule = ?, waitlist_rule = ?, failure_rule = ?, faq_summary = ?, start_date = ?, end_date = ?,
                 signup_deadline = ?, created_at = ?, updated_at = ?
             WHERE class_id = ?
             """,
@@ -96,6 +96,9 @@ class SQLiteClassRepository:
                 updated.current_students,
                 updated.waitlist_count,
                 updated.course_subtitle,
+                updated.cover_image_url,
+                updated.highlights,
+                updated.owner_id,
                 updated.target_audience,
                 updated.unsuitable_audience,
                 updated.course_goal,
@@ -134,6 +137,9 @@ class SQLiteClassRepository:
             group_class.current_students,
             group_class.waitlist_count,
             group_class.course_subtitle,
+            group_class.cover_image_url,
+            group_class.highlights,
+            group_class.owner_id,
             group_class.target_audience,
             group_class.unsuitable_audience,
             group_class.course_goal,
@@ -168,6 +174,9 @@ class SQLiteClassRepository:
             current_students=row["current_students"],
             waitlist_count=row["waitlist_count"],
             course_subtitle=row["course_subtitle"],
+            cover_image_url=row["cover_image_url"],
+            highlights=row["highlights"],
+            owner_id=row["owner_id"],
             target_audience=row["target_audience"],
             unsuitable_audience=row["unsuitable_audience"],
             course_goal=row["course_goal"],

@@ -24,6 +24,9 @@ class GroupClass:
     current_students: int
     waitlist_count: int
     course_subtitle: str | None
+    cover_image_url: str | None
+    highlights: str | None
+    owner_id: str | None
     target_audience: str | None
     unsuitable_audience: str | None
     course_goal: str | None
@@ -54,6 +57,9 @@ class GroupClass:
         min_students: int | None = None,
         max_students: int | None = None,
         course_subtitle: str | None = None,
+        cover_image_url: str | None = None,
+        highlights: str | None = None,
+        owner_id: str | None = None,
         target_audience: str | None = None,
         unsuitable_audience: str | None = None,
         course_goal: str | None = None,
@@ -99,6 +105,9 @@ class GroupClass:
             current_students=0,
             waitlist_count=0,
             course_subtitle=course_subtitle,
+            cover_image_url=cover_image_url,
+            highlights=highlights,
+            owner_id=owner_id,
             target_audience=target_audience,
             unsuitable_audience=unsuitable_audience,
             course_goal=course_goal,

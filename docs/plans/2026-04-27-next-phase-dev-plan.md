@@ -12,13 +12,13 @@ Depends on: docs/plans/2026-04-14-gap-analysis.md（P0-Critical 已全部完成�
 
 ### 已完成（截至 2026-04-28）
 
-**后端 API（148 tests passed）**
+**后端 API（149 tests passed）**
 - FastAPI routers 已覆盖 classes CRUD、审核流、课程取消、注册 CRUD、报名导出、模板 CRUD
 - 两套仓储：InMemory（运行态）+ SQLite（测试用）
 - 权限模型：INITIATOR / CLASS_ADMIN / SUPER_ADMIN
 - AuditWriter（NullAuditWriter，结构已定，未持久化）
 
-**前端（app.js 1186行，api.js 695行）**
+**前端（app.js 1196行，api.js 695行）**
 - 前台：看板、详情、报名表单（ENROLLMENT/WAITLIST/TRIAL）、报名成功页、底部 FAQ
 - 后台：课程列表、创建、编辑、详情（含审核）、模板列表/创建/编辑、报名列表、报名详情（含备注+状态）
 - 交互：Toast 通知、空/错误状态统一、角色切换（家长/管理员）、路由守卫
@@ -51,7 +51,7 @@ Depends on: docs/plans/2026-04-14-gap-analysis.md（P0-Critical 已全部完成�
 | H4 | 课程筛选 / 搜索 | 后端 + 前端 | ✅ 已完成 |
 | H5 | 自动状态计算（60% 成班规则） | 后端 | ✅ 已完成 |
 | H6 | 候补转正流程 | 后端 + 前端 | ✅ 已完成 |
-| H7 | 课程封面 / 亮点 / 负责人字段 | 后端 + 前端 | ⬜ 待开始 |
+| H7 | 课程封面 / 亮点 / 负责人字段 | 后端 + 前端 | ✅ 已完成 |
 | H8 | 分享链接（复制到剪贴板） | 前端 | ⬜ 待开始 |
 
 ### P2（业务闭环，暂不纳入）
@@ -384,6 +384,13 @@ PRD 7.3 要求报名成功页展示「课程当前状态」，以便家长了解
 **后端**：`GroupClass` 模型新增 `cover_image_url`（str | None）、`highlights`（str | None）、`owner_id`（str | None）；同步更新 schema DDL、仓储 SQL、`_MUTABLE_FIELD_MAP`、序列化函数。  
 **前端**：创建/编辑表单新增三个字段；前台详情页 hero 区展示封面图（img 标签，src 为 cover_image_url）；课程亮点在详情页单独成区域。  
 **验收**：字段可写入、可读取；封面图字段为空时不渲染 img 标签。
+
+**完成记录（2026-05-09）**
+
+- `GroupClass`、SQLite schema、仓储 SQL、课程创建/更新/序列化均支持 `coverImageUrl`、`highlights`、`ownerId`
+- 课程创建/编辑表单新增封面图 URL、课程亮点、负责人 ID 字段
+- 前台详情页有封面时渲染 `img`，无封面时不渲染；课程亮点单独展示
+- 自测：`node --check api.js/app.js` 通过；`uv run pytest tests/ -q` -> `149 passed`
 
 ---
 

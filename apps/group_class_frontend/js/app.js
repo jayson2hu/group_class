@@ -353,6 +353,8 @@ async function renderPublicDetail(classId) {
   const minStudents = detail.minStudents ?? "-";
   const maxStudents = detail.maxStudents ?? "-";
   const remainingSeats = detail.remainingSeats ?? (typeof detail.maxStudents === "number" ? Math.max(detail.maxStudents - currentStudents, 0) : null);
+  const coverImage = detail.coverImageUrl ? `<img class="detail-cover-image" src="${detail.coverImageUrl}" alt="${detail.className || "课程封面"}" />` : "";
+  const highlights = detail.highlights ? `<section class="panel detail-highlights-panel"><h3>课程亮点</h3><p>${detail.highlights}</p></section>` : "";
 
   setHtml(`
     <section class="panel detail-hero">
@@ -373,6 +375,7 @@ async function renderPublicDetail(classId) {
         </div>
       </div>
       <aside class="detail-hero-side">
+        ${coverImage}
         <div class="detail-side-card">
           <h3>报名决策信息</h3>
           <dl class="detail-facts detail-facts-stack">
@@ -383,6 +386,7 @@ async function renderPublicDetail(classId) {
         </div>
       </aside>
     </section>
+    ${highlights}
     <section class="detail-content-grid">
       <article class="panel detail-section-card">
         <h3>适合对象</h3><p class="detail-copy">${detail.targetAudience || "暂未配置"}</p>
@@ -553,6 +557,8 @@ function adminClassFormHtml(detail = {}, isEdit = false, templates = []) {
           <div class="row"><label>课程名称</label><input name="className" value="${detail.className || ""}" /></div>
           <div class="row"><label>课程类型 <span class="required-mark">*</span></label><select name="classType" required><option value="GROUP_CLASS" ${detail.classType === "GROUP_CLASS" ? "selected" : ""}>GROUP_CLASS</option><option value="TRIAL" ${detail.classType === "TRIAL" ? "selected" : ""}>TRIAL</option><option value="NORMAL" ${detail.classType === "NORMAL" ? "selected" : ""}>NORMAL</option></select></div>
           <div class="row"><label>课程副标题</label><input name="courseSubtitle" value="${detail.courseSubtitle || ""}" /></div>
+          <div class="row full-span"><label>封面图 URL</label><input name="coverImageUrl" value="${detail.coverImageUrl || ""}" placeholder="https://..." /></div>
+          <div class="row"><label>负责人 ID</label><input name="ownerId" value="${detail.ownerId || ""}" /></div>
           <div class="row"><label>课程价格</label><input name="priceAmount" type="number" min="0" value="${detail.priceAmount ?? ""}" /></div>
           <div class="row"><label>订金金额</label><input name="depositAmount" type="number" min="0" value="${detail.depositAmount ?? ""}" /></div>
         </div>
@@ -573,6 +579,7 @@ function adminClassFormHtml(detail = {}, isEdit = false, templates = []) {
         <div class="form-section-head"><h3>展示文案</h3><p class="muted">用于前台详情页展示的文案与规则说明。</p></div>
         <div class="form-grid two-columns">
           <div class="row full-span"><label>适合对象</label><textarea name="targetAudience">${detail.targetAudience || ""}</textarea></div>
+          <div class="row full-span"><label>课程亮点</label><textarea name="highlights">${detail.highlights || ""}</textarea></div>
           <div class="row full-span"><label>不适合对象</label><textarea name="unsuitableAudience">${detail.unsuitableAudience || ""}</textarea></div>
           <div class="row full-span"><label>课程目标</label><textarea name="courseGoal">${detail.courseGoal || ""}</textarea></div>
           <div class="row"><label>拼班规则</label><textarea name="groupRule">${detail.groupRule || ""}</textarea></div>
@@ -604,6 +611,9 @@ function bindAdminClassForm(classId) {
       templateId: String(formData.get("templateId") || "").trim(),
       classType: String(formData.get("classType") || "").trim(),
       courseSubtitle: String(formData.get("courseSubtitle") || "").trim(),
+      coverImageUrl: String(formData.get("coverImageUrl") || "").trim(),
+      highlights: String(formData.get("highlights") || "").trim(),
+      ownerId: String(formData.get("ownerId") || "").trim(),
       priceAmount: parseIntOrNull(formData.get("priceAmount")),
       depositAmount: parseIntOrNull(formData.get("depositAmount")),
       minStudents: parseIntOrNull(formData.get("minStudents")),
