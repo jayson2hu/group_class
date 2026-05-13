@@ -161,6 +161,12 @@ function formatDateRange(startDate, endDate) {
   return `${startDate || "-"} ~ ${endDate || "-"}`;
 }
 
+function firstLineSummary(value, maxLength = 34) {
+  const text = String(value || "").split(/\r?\n/).map((line) => line.trim()).find(Boolean) || "";
+  if (!text) return "";
+  return text.length > maxLength ? `${text.slice(0, maxLength)}...` : text;
+}
+
 function parseIntOrNull(value) {
   const text = String(value || "").trim();
   if (!text) return null;
@@ -309,6 +315,12 @@ async function renderPublicList(queryParams = new URLSearchParams()) {
     const currentStudents = item.currentStudents ?? 0;
     const maxStudents = item.maxStudents ?? "-";
     const remainingSeats = item.remainingSeats ?? (typeof item.maxStudents === "number" ? Math.max(item.maxStudents - currentStudents, 0) : null);
+    const audienceSummary = firstLineSummary(item.targetAudience);
+    const highlightSummary = firstLineSummary(item.highlights);
+    const decisionTags = [
+      audienceSummary ? ["适合", audienceSummary] : null,
+      highlightSummary ? ["亮点", highlightSummary] : null,
+    ].filter(Boolean);
     return `
       <article class="panel class-card">
         <div class="class-card-head">
@@ -320,6 +332,7 @@ async function renderPublicList(queryParams = new URLSearchParams()) {
           ${statusChip(item.status, item.statusLabel)}
         </div>
         <p class="class-card-progress">${item.progressText || "支持报名、候补与状态联动更新"}</p>
+        ${decisionTags.length ? `<div class="class-card-decision-tags">${decisionTags.map(([label, text]) => `<div class="decision-tag"><span>${label}</span><strong>${text}</strong></div>`).join("")}</div>` : ""}
         <div class="class-card-metrics">
           <div class="metric-tile metric-tile-accent"><span class="metric-label">剩余名额</span><strong class="metric-value">${remainingSeats ?? "-"}</strong></div>
           <div class="metric-tile"><span class="metric-label">课程价格</span><strong class="metric-value">¥${item.priceAmount ?? "-"}</strong></div>

@@ -487,13 +487,27 @@ uv run pytest tests/ -q
 | X5 | 业务经营体验报告 | ✅ 已完成 | 文档 review | - |
 | X6 | 移动端体验报告 | ✅ 已完成 | 文档 review | - |
 | X7 | 问题池合并和优先级排序 | ✅ 已完成 | 文档 review | - |
-| K1 | 前台课程卡片决策信息增强 | ✅ 已确认 | - | - |
+| K1 | 前台课程卡片决策信息增强 | ✅ 已完成 | `node --check app.js`; `node --check api.js`; `uv run pytest tests/ -q` 149 passed | `feat: improve public class cards` |
 | K2 | 报名成功页后续预期增强 | ✅ 已确认 | - | - |
 | K3 | 候补成功预期增强 | ✅ 已确认 | - | - |
 | K4 | 报名列表状态筛选和待跟进视图 | ✅ 已确认 | - | - |
 | K5 | 发布前课程完整性校验 | ✅ 已确认 | - | - |
 
 ---
+
+## 7.1 完成记录
+
+### K1 完成记录（2026-05-13）
+
+- 前台课程卡片新增“适合”和“亮点”决策标签，分别复用 `targetAudience` 与 `highlights` 第一行摘要。
+- 无 `targetAudience` 或 `highlights` 时不展示空标签，避免空占位。
+- mock 课程补充 `highlights`，便于本地 mock 模式验证前台效果。
+- 移动端样式复用卡片单列布局，避免决策标签挤压 CTA。
+- 自测：
+  - `node --check apps/group_class_frontend/js/app.js`
+  - `node --check apps/group_class_frontend/js/api.js`
+  - `/Users/fayun/.local/bin/uv run pytest tests/ -q`（149 passed）
+- Commit：`feat: improve public class cards`
 
 ## 8. 验收口径
 

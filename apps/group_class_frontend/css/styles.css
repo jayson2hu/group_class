@@ -786,6 +786,38 @@ img {
   line-height: 1.7;
 }
 
+.class-card-decision-tags {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.decision-tag {
+  min-width: 0;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(191, 219, 254, 0.84);
+  background: rgba(239, 246, 255, 0.74);
+}
+
+.decision-tag span {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--primary);
+}
+
+.decision-tag strong {
+  display: block;
+  overflow: hidden;
+  color: var(--text-soft);
+  font-size: 14px;
+  line-height: 1.5;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .class-card-metrics {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1531,6 +1563,7 @@ tbody tr:hover {
   .list-hero-summary,
   .class-card-metrics,
   .class-card-facts,
+  .class-card-decision-tags,
   .detail-metrics,
   .enrollment-hero,
   .form-grid.two-columns,
