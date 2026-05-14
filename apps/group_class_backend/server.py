@@ -12,6 +12,7 @@ from urllib.parse import parse_qs, urlparse
 from uuid import uuid4
 
 from apps.group_class_backend.audit.interface import NullAuditWriter
+from apps.group_class_backend.auth.configuration import AuthConfiguration, InMemoryAuthConfigurationRepository
 from apps.group_class_backend.classes.controller import (
     approve_class_review,
     create_class_draft,
@@ -146,6 +147,7 @@ class AppState:
         self.storage = (storage or os.getenv("GROUP_CLASS_STORAGE", "memory")).strip().lower()
         self.audit_writer = NullAuditWriter()
         self.active_tokens: dict[str, dict[str, Any]] = {}
+        self.auth_configuration_repository = InMemoryAuthConfigurationRepository()
         self.sqlite_connection: sqlite3.Connection | None = None
 
         if self.storage == "sqlite":
@@ -248,6 +250,17 @@ class GroupClassRequestHandler(BaseHTTPRequestHandler):
             if path.startswith("/api/v1/admin/"):
                 if self._require_admin_auth(request_id) is None:
                     return
+
+            if path == "/api/v1/admin/auth/configuration":
+                self._write_json(
+                    200,
+                    {
+                        "requestId": request_id,
+                        "code": ErrorCode.OK.value,
+                        "data": self.state.auth_configuration_repository.get().to_response(),
+                    },
+                )
+                return
 
             if path == "/api/v1/public/classes":
                 payload = list_classes(
@@ -377,6 +390,20 @@ class GroupClassRequestHandler(BaseHTTPRequestHandler):
             if path.startswith("/api/v1/admin/"):
                 if self._require_admin_auth(request_id) is None:
                     return
+
+            if path == "/api/v1/admin/auth/configuration":
+                body = self._read_json_body()
+                configuration = AuthConfiguration.from_payload(body)
+                saved = self.state.auth_configuration_repository.save(configuration)
+                self._write_json(
+                    200,
+                    {
+                        "requestId": request_id,
+                        "code": ErrorCode.OK.value,
+                        "data": saved.to_response(),
+                    },
+                )
+                return
 
             if path == "/api/v1/public/registrations":
                 payload = self._read_json_body()
