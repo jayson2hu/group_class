@@ -195,6 +195,13 @@ export class ApiClient {
     return session;
   }
 
+  async getAuthConfiguration() {
+    const result = await requestJson(`${this.baseUrl}/api/v1/admin/auth/configuration`, {
+      headers: this.buildHeaders({}, true),
+    });
+    return result.data || result;
+  }
+
   logout() {
     this.clearAuthSession();
   }

@@ -91,6 +91,28 @@ function loginHtml() {
   `;
 }
 
+function authMethodConfigHtml(config) {
+  const qrEnabled = Boolean(config?.wechatEnabled && (config.enabledLoginMethods || []).includes("wechat_qr"));
+  const emailEnabled = Boolean(config?.emailEnabled && (config.enabledLoginMethods || []).includes("email"));
+  const qrMarkup = qrEnabled
+    ? `<div class="metric-tile"><span class="metric-label">扫码登录</span><strong class="metric-value">已启用</strong><p class="muted">使用单个公众号二维码登录。</p></div>`
+    : `<div class="metric-tile"><span class="metric-label">扫码登录</span><strong class="metric-value">未启用</strong><p class="muted">管理员可在认证配置中启用。</p></div>`;
+  const emailMarkup = emailEnabled
+    ? `<div class="metric-tile"><span class="metric-label">邮箱登录</span><strong class="metric-value">已启用</strong><p class="muted">验证码有效期 ${escapeHtml(config.emailCodeTtlSeconds || 300)} 秒。</p></div>`
+    : `<div class="metric-tile"><span class="metric-label">邮箱登录</span><strong class="metric-value">未启用</strong><p class="muted">管理员可在认证配置中启用。</p></div>`;
+  return `
+    <section class="panel">
+      <p class="section-kicker">Auth Methods</p>
+      <h3>登录方式配置状态</h3>
+      <div class="admin-metric-grid">
+        <div class="metric-tile"><span class="metric-label">用户名登录</span><strong class="metric-value">已启用</strong><p class="muted">已注册普通用户和后台用户均可使用。</p></div>
+        ${qrMarkup}
+        ${emailMarkup}
+      </div>
+    </section>
+  `;
+}
+
 function loginErrorHtml(message) {
   return `
     <section class="panel login-panel">
@@ -176,7 +198,8 @@ async function renderRoute() {
   }
 
   if (path === "classes") {
-    setHtml(placeholderHtml("课程管理", "独立后台入口已建立。课程管理迁移将在后续小功能中接入。"));
+    const config = await api.getAuthConfiguration().catch(() => null);
+    setHtml(`${placeholderHtml("课程管理", "独立后台入口已建立。课程管理迁移将在后续小功能中接入。")}${authMethodConfigHtml(config)}`);
     return;
   }
   if (path === "registrations") {
