@@ -588,11 +588,36 @@ function adminClassFormHtml(detail = {}, isEdit = false) {
   `;
 }
 
+function ensureAdminClassExtraFields(form) {
+  if (form.querySelector('[name="openingLevel"]')) return;
+  const courseSubtitleInput = form.querySelector('[name="courseSubtitle"]');
+  const anchor = courseSubtitleInput?.closest(".row");
+  if (!anchor) return;
+  const fieldHtml = `
+    <div class="row"><label>开课等级</label><input name="openingLevel" placeholder="例：三年级进阶" /></div>
+    <div class="row"><label>等级标识</label><input name="levelMarker" placeholder="例：L3 / ADV" /></div>
+    <div class="row"><label>展示颜色</label><input name="displayColor" type="color" value="#2563eb" /></div>
+    <div class="row"><label>微信号</label><input name="wechatContact" /></div>
+    <div class="row"><label>手机联系方式</label><input name="phoneContact" inputmode="tel" /></div>
+  `;
+  anchor.insertAdjacentHTML("afterend", fieldHtml);
+}
+
+function fillAdminClassExtraFields(form, detail = {}) {
+  const fieldNames = ["openingLevel", "levelMarker", "displayColor", "wechatContact", "phoneContact"];
+  fieldNames.forEach((name) => {
+    const input = form.querySelector(`[name="${name}"]`);
+    if (!input) return;
+    input.value = detail[name] || (name === "displayColor" ? "#2563eb" : "");
+  });
+}
+
 function bindAdminClassForm(classId) {
   const form = document.getElementById("admin-class-form");
   const errorNode = document.getElementById("admin-class-form-error");
   const submitButton = document.getElementById("admin-class-submit-btn");
   if (!form || !errorNode || !submitButton) return;
+  ensureAdminClassExtraFields(form);
   const isEdit = Boolean(classId);
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -603,6 +628,11 @@ function bindAdminClassForm(classId) {
       className: String(formData.get("className") || "").trim(),
       classType: String(formData.get("classType") || "").trim(),
       courseSubtitle: String(formData.get("courseSubtitle") || "").trim(),
+      openingLevel: String(formData.get("openingLevel") || "").trim(),
+      levelMarker: String(formData.get("levelMarker") || "").trim(),
+      displayColor: String(formData.get("displayColor") || "").trim(),
+      wechatContact: String(formData.get("wechatContact") || "").trim(),
+      phoneContact: String(formData.get("phoneContact") || "").trim(),
       priceAmount: parseIntOrNull(formData.get("priceAmount")),
       depositAmount: parseIntOrNull(formData.get("depositAmount")),
       minStudents: parseIntOrNull(formData.get("minStudents")),
@@ -652,6 +682,7 @@ async function renderAdminEditClass(classId) {
   }
   setHtml(adminClassFormHtml(detail, true));
   bindAdminClassForm(classId);
+  fillAdminClassExtraFields(document.getElementById("admin-class-form"), detail);
 }
 
 function reviewButtons(detail) {
