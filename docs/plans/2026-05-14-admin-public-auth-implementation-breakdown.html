@@ -455,6 +455,43 @@
         </tbody>
       </table>
     </section>
+    <section id="progress-2026-05-14-f5">
+      <h2>2026-05-14 F5 进度更新</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>小功能</th>
+            <th>状态</th>
+            <th>自测</th>
+            <th>验收标准</th>
+            <th>提交</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>F5.1 课程等级与联系字段后端支持</td>
+            <td><span class="done">已完成</span></td>
+            <td>课程模块测试通过，覆盖创建、更新、公开列表和 SQLite 仓库字段持久化。</td>
+            <td>课程支持开课等级、等级标识、展示颜色、微信号、手机联系方式字段；后台详情返回完整字段；公开列表返回等级和颜色展示字段。</td>
+            <td><code>feat(classes): add level marker and contact fields</code></td>
+          </tr>
+          <tr>
+            <td>F5.2 后台课程表单接入等级与联系字段</td>
+            <td><span class="todo">待开发</span></td>
+            <td>待补充前端语法检查与页面自测。</td>
+            <td>创建人可在后台表单设置开课等级、等级标识、展示颜色、微信号、手机联系方式。</td>
+            <td><code>feat(admin): edit class level and contact fields</code></td>
+          </tr>
+          <tr>
+            <td>F5.3 课程联系方式隐私展示</td>
+            <td><span class="todo">待开发</span></td>
+            <td>待补充游客、登录用户、后台角色的接口和页面自测。</td>
+            <td>游客不展示详细联系方式；登录用户可见微信号但不可见隐私手机号；管理员、运营、老师可见手机号。</td>
+            <td><code>feat(classes): enforce contact privacy rules</code></td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
   </main>
 </body>
 </html>

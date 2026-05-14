@@ -24,6 +24,11 @@ class GroupClass:
     current_students: int
     waitlist_count: int
     course_subtitle: str | None
+    opening_level: str | None
+    level_marker: str | None
+    display_color: str | None
+    wechat_contact: str | None
+    phone_contact: str | None
     target_audience: str | None
     unsuitable_audience: str | None
     course_goal: str | None
@@ -54,6 +59,11 @@ class GroupClass:
         min_students: int | None = None,
         max_students: int | None = None,
         course_subtitle: str | None = None,
+        opening_level: str | None = None,
+        level_marker: str | None = None,
+        display_color: str | None = None,
+        wechat_contact: str | None = None,
+        phone_contact: str | None = None,
         target_audience: str | None = None,
         unsuitable_audience: str | None = None,
         course_goal: str | None = None,
@@ -99,6 +109,11 @@ class GroupClass:
             current_students=0,
             waitlist_count=0,
             course_subtitle=course_subtitle,
+            opening_level=opening_level,
+            level_marker=level_marker,
+            display_color=display_color,
+            wechat_contact=wechat_contact,
+            phone_contact=phone_contact,
             target_audience=target_audience,
             unsuitable_audience=unsuitable_audience,
             course_goal=course_goal,

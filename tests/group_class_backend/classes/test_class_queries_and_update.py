@@ -1135,6 +1135,9 @@ def test_list_classes_returns_paged_admin_items() -> None:
         "className",
         "status",
         "classType",
+        "openingLevel",
+        "levelMarker",
+        "displayColor",
         "startDate",
         "endDate",
         "signupDeadline",
@@ -1534,6 +1537,9 @@ def test_list_classes_public_only_returns_frontend_card_fields() -> None:
             max_students=6,
             current_students=6,
             waitlist_count=2,
+            opening_level="grade 4",
+            level_marker="L4",
+            display_color="#2563eb",
             updated_at=datetime(2026, 4, 12, 18, 0, tzinfo=timezone.utc),
         )
     )
@@ -1557,6 +1563,39 @@ def test_list_classes_public_only_returns_frontend_card_fields() -> None:
     assert item["primaryActionLabel"] == "加入候补"
     assert item["remainingSeats"] == 0
     assert item["waitlistCount"] == 2
+    assert item["openingLevel"] == "grade 4"
+    assert item["levelMarker"] == "L4"
+    assert item["displayColor"] == "#2563eb"
+
+
+def test_update_class_draft_persists_level_marker_color_and_contacts() -> None:
+    repository = InMemoryClassRepository()
+    class_id = _seed_class(repository)
+
+    response = update_class_draft(
+        class_id=class_id,
+        payload={
+            "version": 1,
+            "openingLevel": "grade 5",
+            "levelMarker": "L5",
+            "displayColor": "#dc2626",
+            "wechatContact": "wechat_updated",
+            "phoneContact": "13900139000",
+        },
+        repository=repository,
+        audit_writer=NullAuditWriter(),
+        request_id="req-update-level-001",
+        actor_id="admin-001",
+        actor_roles=["CLASS_ADMIN"],
+        now=datetime(2026, 4, 12, 19, 0, tzinfo=timezone.utc),
+    )
+
+    assert response["code"] == ErrorCode.OK
+    assert response["data"]["openingLevel"] == "grade 5"
+    assert response["data"]["levelMarker"] == "L5"
+    assert response["data"]["displayColor"] == "#dc2626"
+    assert response["data"]["wechatContact"] == "wechat_updated"
+    assert response["data"]["phoneContact"] == "13900139000"
 
 
 

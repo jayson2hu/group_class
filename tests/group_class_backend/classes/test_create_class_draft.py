@@ -389,3 +389,30 @@ def test_create_class_draft_returns_validation_error_with_details() -> None:
             }
         ],
     }
+
+
+def test_create_class_draft_persists_level_marker_color_and_contacts() -> None:
+    repository = InMemoryClassRepository()
+
+    response = create_class_draft(
+        payload={
+            "className": "spring english group class",
+            "openingLevel": "grade 3 advanced",
+            "levelMarker": "ADV",
+            "displayColor": "#16a34a",
+            "wechatContact": "teacher_wechat",
+            "phoneContact": "13800138000",
+        },
+        repository=repository,
+        audit_writer=NullAuditWriter(),
+        request_id="req-create-level-001",
+        actor_id="admin-001",
+        now=datetime(2026, 4, 12, 10, 0, tzinfo=timezone.utc),
+    )
+
+    assert response["code"] == ErrorCode.OK
+    assert response["data"]["openingLevel"] == "grade 3 advanced"
+    assert response["data"]["levelMarker"] == "ADV"
+    assert response["data"]["displayColor"] == "#16a34a"
+    assert response["data"]["wechatContact"] == "teacher_wechat"
+    assert response["data"]["phoneContact"] == "13800138000"
