@@ -1,0 +1,493 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>管理后台与课程列表拆分优化计划</title>
+  <style>
+    :root {
+      --bg: #f6f7f9;
+      --surface: #ffffff;
+      --text: #1f2937;
+      --muted: #667085;
+      --border: #e5e7eb;
+      --primary: #2563eb;
+      --primary-soft: #eff6ff;
+      --ok: #047857;
+      --warn: #b45309;
+      --danger: #b91c1c;
+      --shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      line-height: 1.65;
+    }
+
+    .shell {
+      width: min(1120px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 32px 0 56px;
+    }
+
+    header,
+    section {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--surface);
+      box-shadow: var(--shadow);
+    }
+
+    header {
+      padding: 28px;
+    }
+
+    section {
+      margin-top: 16px;
+      padding: 24px;
+    }
+
+    .eyebrow {
+      margin: 0 0 8px;
+      color: var(--primary);
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 30px;
+      line-height: 1.25;
+    }
+
+    h2 {
+      margin: 0 0 12px;
+      font-size: 22px;
+    }
+
+    h3 {
+      margin: 20px 0 8px;
+      font-size: 17px;
+    }
+
+    p { margin: 8px 0; }
+
+    ul,
+    ol {
+      margin: 8px 0 0;
+      padding-left: 22px;
+    }
+
+    li { margin: 6px 0; }
+
+    .summary {
+      max-width: 900px;
+      margin: 12px 0 0;
+      color: var(--muted);
+    }
+
+    nav {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 18px 0;
+    }
+
+    nav a {
+      display: inline-flex;
+      align-items: center;
+      min-height: 36px;
+      padding: 0 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--surface);
+      color: var(--primary);
+      text-decoration: none;
+      font-weight: 600;
+    }
+
+    table {
+      width: 100%;
+      margin-top: 12px;
+      border-collapse: collapse;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--surface);
+    }
+
+    th,
+    td {
+      padding: 12px;
+      border-bottom: 1px solid var(--border);
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      background: #f9fafb;
+      font-weight: 700;
+    }
+
+    tr:last-child td { border-bottom: 0; }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 12px;
+    }
+
+    .card {
+      padding: 16px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: #fbfcfe;
+    }
+
+    .card strong {
+      display: block;
+      margin-bottom: 6px;
+    }
+
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      min-height: 26px;
+      padding: 0 8px;
+      border-radius: 8px;
+      background: var(--primary-soft);
+      color: var(--primary);
+      font-size: 12px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .must { color: var(--danger); font-weight: 700; }
+    .should { color: var(--warn); font-weight: 700; }
+    .success { color: var(--ok); font-weight: 700; }
+
+    .note {
+      padding: 12px 14px;
+      border-left: 4px solid var(--primary);
+      background: var(--primary-soft);
+      border-radius: 8px;
+      color: #1e3a8a;
+    }
+
+    code {
+      padding: 2px 5px;
+      border-radius: 6px;
+      background: #f3f4f6;
+      font-family: Consolas, "SFMono-Regular", monospace;
+      font-size: 0.95em;
+    }
+
+    @media (max-width: 860px) {
+      .grid { grid-template-columns: 1fr; }
+      header, section { padding: 18px; }
+      table { display: block; overflow-x: auto; }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header>
+      <p class="eyebrow">PLAN / IA + AUTH + ADMIN SEO</p>
+      <h1>管理后台与课程列表拆分优化计划</h1>
+      <p class="summary">
+        本计划用于审阅管理后台和课程前台的拆分方案。核心方向是：普通用户只看到课程、拼课进度、报名与个人报名记录；后台使用独立文件和独立路由，面向管理员、运营、老师；登录注册支持公众号扫码、邮箱、用户名等方式，并由后台配置对应能力；管理员后台新增 SEO 管理能力，用于优化网站展示。
+      </p>
+    </header>
+
+    <nav aria-label="文档导航">
+      <a href="#goals">目标</a>
+      <a href="#confirmed">已确认需求</a>
+      <a href="#solution">前后台拆分</a>
+      <a href="#auth">注册登录</a>
+      <a href="#course">开课配置</a>
+      <a href="#roles">后台权限</a>
+      <a href="#seo">SEO</a>
+      <a href="#milestones">里程碑</a>
+      <a href="#acceptance">验收</a>
+      <a href="#questions">待确认</a>
+    </nav>
+
+    <section id="goals">
+      <h2>1. 优化目标</h2>
+      <div class="grid">
+        <div class="card">
+          <strong>课程前台独立</strong>
+          游客和普通用户只进入课程列表、课程详情、拼课进度、报名/候补/试听和个人报名记录。
+        </div>
+        <div class="card">
+          <strong>管理后台独立</strong>
+          后台使用独立文件、独立路由、独立导航，避免和课程列表耦合，不向普通用户暴露后台入口。
+        </div>
+        <div class="card">
+          <strong>登录注册多途径</strong>
+          支持公众号扫码、邮箱、用户名登录；注册支持公众号扫码关注和邮箱方式，不再依赖短信服务。
+        </div>
+      </div>
+    </section>
+
+    <section id="confirmed">
+      <h2>2. 已确认需求</h2>
+      <ul>
+        <li><span class="success">已确认</span> 游客可以看到课程对应的拼课进度和开课情况。</li>
+        <li><span class="success">已确认</span> 已登录用户可以看到自己的历史参与拼课记录，也可以看到待拼课、待开课等状态。</li>
+        <li><span class="success">已确认</span> 后台角色包含管理员、运营、老师；管理员是最高权限。</li>
+        <li><span class="success">已确认</span> 管理员可以管理全部账号，包含普通用户、运营、老师账号的添加、删除、禁用、修改等基础操作。</li>
+        <li><span class="success">已确认</span> 运营可以管理老师账号和普通用户账号，但不能管理管理员账号。</li>
+        <li><span class="success">已确认</span> 当前无法提供短信服务，因此注册和登录不规划短信验证码能力。</li>
+        <li><span class="success">已确认</span> 公众号扫码登录暂按后台配置能力处理，登录或注册方式由管理员决定启用。</li>
+        <li><span class="success">已确认</span> 邮箱登录使用验证码，有效期 5 分钟。</li>
+        <li><span class="success">已确认</span> 用户名登录对普通用户和后台用户全部开放，前提是账号已经通过公众号或邮箱等其他方式完成注册。</li>
+        <li><span class="success">已确认</span> 公众号配置采用单个公众号。</li>
+        <li><span class="success">已确认</span> “我的报名”支持取消报名、修改资料、查看缴费状态。</li>
+        <li><span class="success">已确认</span> 缴费暂不支持个人线上付款，由管理员、运营或老师在后台维护缴费状态。</li>
+        <li><span class="success">已确认</span> 后台使用独立文件和独立路由，尽量不与前台耦合。</li>
+        <li><span class="success">已确认</span> 管理员后台需要加入完整 SEO 管理能力，用于对网站进行优化。</li>
+        <li><span class="success">已确认</span> 开课等级由创建人决定，可配置对应标识；课程展示颜色由创建人自己设置；课程必须有名称。</li>
+        <li><span class="success">已确认</span> 游客不展示详细隐私信息；登录用户可以看到用户微信，不可以看到隐私手机号；管理员、运营、老师可以看到手机号。</li>
+        <li><span class="success">已确认</span> 文档审核输出为 HTML，便于直接打开审阅。</li>
+      </ul>
+    </section>
+
+    <section id="solution">
+      <h2>3. 前后台拆分方案</h2>
+      <h3>3.1 前台：课程报名与拼课中心</h3>
+      <ul>
+        <li><span class="must">必须</span> 前台默认首页展示课程列表、课程详情、拼课进度、剩余名额、开课状态、报名入口。</li>
+        <li><span class="must">必须</span> 游客可查看公开课程和拼课情况，但不能看到管理后台入口。</li>
+        <li><span class="must">必须</span> 登录用户可进入“我的报名”，查看历史拼课、待拼课、待开课、已取消、已完成等记录。</li>
+        <li><span class="must">必须</span> “我的报名”支持取消报名、修改资料、查看缴费状态。</li>
+        <li><span class="must">必须</span> 前台导航只包含课程、我的报名、登录/注册或用户信息。</li>
+      </ul>
+
+      <h3>3.2 后台：独立管理工作台</h3>
+      <ul>
+        <li><span class="must">必须</span> 新增独立后台入口文件，例如 <code>admin.html</code>。</li>
+        <li><span class="must">必须</span> 后台使用独立路由空间，例如 <code>/admin.html#/classes</code>、<code>/admin.html#/registrations</code>、<code>/admin.html#/seo</code>。</li>
+        <li><span class="must">必须</span> 后台 JS、CSS、路由守卫尽量独立，不复用前台主导航和页面壳。</li>
+        <li><span class="must">必须</span> 普通用户 token 访问后台时显示无权限或跳转后台登录，不展示后台数据。</li>
+      </ul>
+
+      <h3>3.3 推荐文件与路由结构</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>入口</th>
+            <th>路由</th>
+            <th>页面</th>
+            <th>访问对象</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>index.html</code></td>
+            <td><code>#/public/classes</code></td>
+            <td>课程列表、拼课进度</td>
+            <td>游客、普通用户</td>
+          </tr>
+          <tr>
+            <td><code>index.html</code></td>
+            <td><code>#/login</code>、<code>#/register</code></td>
+            <td>普通用户登录/注册</td>
+            <td>游客、普通用户</td>
+          </tr>
+          <tr>
+            <td><code>index.html</code></td>
+            <td><code>#/account/registrations</code></td>
+            <td>我的报名、历史拼课、待开课</td>
+            <td>普通登录用户</td>
+          </tr>
+          <tr>
+            <td><code>admin.html</code></td>
+            <td><code>#/login</code></td>
+            <td>后台登录</td>
+            <td>管理员、运营、老师</td>
+          </tr>
+          <tr>
+            <td><code>admin.html</code></td>
+            <td><code>#/classes</code>、<code>#/registrations</code>、<code>#/accounts</code>、<code>#/seo</code></td>
+            <td>课程管理、报名管理、账号管理、SEO 管理</td>
+            <td>后台角色</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="auth">
+      <h2>4. 注册登录优化计划</h2>
+      <h3>4.1 普通用户注册</h3>
+      <ul>
+        <li><span class="must">必须</span> 注册途径 1：通过扫码关注公众号进行登录/注册绑定。</li>
+        <li><span class="must">必须</span> 注册途径 2：通过邮箱注册。</li>
+        <li><span class="must">必须</span> 后台提供单个公众号登录配置：公众号二维码、AppID、AppSecret、回调地址、启用状态，并允许管理员决定是否启用为登录或注册方式。</li>
+        <li><span class="must">必须</span> 后台提供邮箱登录配置：SMTP 服务、发件邮箱、授权码或密钥、验证码有效期、启用状态。</li>
+        <li><span class="must">必须</span> 邮箱注册流程采用“邮箱 + 验证码 + 基础资料”的方式，验证码有效期 5 分钟。</li>
+        <li><span class="should">建议</span> 注册后补充家长姓名、学生姓名、学生年级，用于报名资料自动带出。</li>
+      </ul>
+
+      <h3>4.2 普通用户登录</h3>
+      <ul>
+        <li><span class="must">必须</span> 登录方式 1：扫描二维码登录，二维码可引导关注公众号并完成登录绑定；是否启用由管理员后台配置决定。</li>
+        <li><span class="must">必须</span> 登录方式 2：邮箱验证码登录，验证码有效期 5 分钟。</li>
+        <li><span class="must">必须</span> 登录方式 3：用户名登录，普通用户和后台用户均可使用；普通用户需先通过公众号或邮箱等方式完成注册。</li>
+        <li><span class="must">必须</span> 登录页不再出现后台演示账号说明。</li>
+        <li><span class="must">必须</span> 从报名页触发登录后，登录成功需要回到原课程报名流程。</li>
+      </ul>
+
+      <h3>4.3 后台登录</h3>
+      <ul>
+        <li><span class="must">必须</span> 后台登录放在 <code>admin.html#/login</code>，不和普通用户登录页混用。</li>
+        <li><span class="must">必须</span> 后台登录支持用户名登录；是否支持邮箱/扫码由后台配置决定。</li>
+        <li><span class="must">必须</span> 登录成功后校验角色，只有管理员、运营、老师可以进入后台。</li>
+        <li><span class="must">必须</span> 角色不匹配时显示“当前账号无后台权限”，并禁止进入后台路由。</li>
+      </ul>
+    </section>
+
+    <section id="course">
+      <h2>5. 开课与课程配置字段</h2>
+      <ul>
+        <li><span class="must">必须</span> 课程必须有课程名称。</li>
+        <li><span class="must">必须</span> 开课等级由创建人决定，用于区分课程层级或开课层级。</li>
+        <li><span class="must">必须</span> 开课等级支持对应标识，例如等级标签、图标或短代码。</li>
+        <li><span class="must">必须</span> 课程展示颜色由创建人自己设置，用于在列表和详情页中区分课程。</li>
+        <li><span class="must">必须</span> 开课配置新增微信号字段，用于展示或后台联系。</li>
+        <li><span class="must">必须</span> 开课配置新增手机联系方式字段，用于展示或后台联系。</li>
+        <li><span class="must">必须</span> 游客不展示课程详细隐私信息。</li>
+        <li><span class="must">必须</span> 登录用户可以看到用户微信，不可以看到隐私手机号码。</li>
+        <li><span class="must">必须</span> 管理员、运营、老师可以查看微信号和手机联系方式。</li>
+      </ul>
+    </section>
+
+    <section id="roles">
+      <h2>6. 后台角色与账号管理</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>角色</th>
+            <th>权限范围</th>
+            <th>账号管理能力</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>管理员</td>
+            <td>最高权限，可访问全部后台功能，包含课程、报名、账号、配置、SEO。</td>
+            <td>可添加、删除、禁用、修改全部账号，包含普通用户、运营、老师。</td>
+          </tr>
+          <tr>
+            <td>运营</td>
+            <td>管理课程、报名、拼课进度、缴费状态、联系信息和部分配置。</td>
+            <td>可管理老师账号和普通用户账号；不允许管理管理员账号。</td>
+          </tr>
+          <tr>
+            <td>老师</td>
+            <td>查看和维护自己相关课程、报名跟进、学生信息、开课状态。</td>
+            <td>默认不允许新增或删除账号。</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="seo">
+      <h2>7. 管理员后台 SEO 优化能力</h2>
+      <ul>
+        <li><span class="must">必须</span> 后台新增完整 SEO 管理页面，仅管理员可完整管理。</li>
+        <li><span class="must">必须</span> 支持配置网站标题、描述、关键词、首页 SEO、课程列表 SEO、课程详情 SEO 模板。</li>
+        <li><span class="must">必须</span> 支持配置 Open Graph / 分享标题、分享描述、分享图片。</li>
+        <li><span class="must">必须</span> 支持生成或维护 <code>sitemap.xml</code> 和 <code>robots.txt</code>。</li>
+        <li><span class="must">必须</span> 支持课程详情页按课程名称、年级、课程等级、开课状态生成动态 meta 信息。</li>
+        <li><span class="must">必须</span> SEO 配置保存后提供预览，避免错误标题或描述影响公开页面。</li>
+      </ul>
+    </section>
+
+    <section id="milestones">
+      <h2>8. 实施里程碑</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>阶段</th>
+            <th>范围</th>
+            <th>交付物</th>
+            <th>优先级</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>P0：前后台隔离</td>
+            <td>移除前台后台入口；新增 <code>admin.html</code>；建立独立后台路由和权限守卫。</td>
+            <td>前台入口、后台入口、路由守卫。</td>
+            <td><span class="tag">最高</span></td>
+          </tr>
+          <tr>
+            <td>P1：登录注册改造</td>
+            <td>公众号扫码、邮箱、用户名登录；注册走公众号/邮箱；后台增加对应配置。</td>
+            <td>登录注册页面、认证 API、后台配置页。</td>
+            <td><span class="tag">高</span></td>
+          </tr>
+          <tr>
+            <td>P1：我的报名</td>
+            <td>历史拼课、待拼课、待开课、取消报名、修改资料、缴费状态查看。</td>
+            <td><code>#/account/registrations</code> 页面和 API。</td>
+            <td><span class="tag">高</span></td>
+          </tr>
+          <tr>
+            <td>P1：账号与角色管理</td>
+            <td>管理员管理全部账号；运营管理老师和普通用户账号；支持新增、删除、禁用、修改基础信息。</td>
+            <td><code>admin.html#/accounts</code>。</td>
+            <td><span class="tag">高</span></td>
+          </tr>
+          <tr>
+            <td>P2：课程与开课字段</td>
+            <td>新增微信号、手机联系方式，完善开课等级、等级标识、课程颜色和课程名称配置。</td>
+            <td>课程表单、详情页展示规则、后台字段。</td>
+            <td><span class="tag">中</span></td>
+          </tr>
+          <tr>
+            <td>P2：SEO 管理</td>
+            <td>后台完整 SEO 配置、分享信息、课程详情 meta 模板、sitemap/robots、预览能力。</td>
+            <td><code>admin.html#/seo</code>。</td>
+            <td><span class="tag">中</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="acceptance">
+      <h2>9. 验收标准</h2>
+      <ul>
+        <li><span class="success">通过</span> 游客打开前台，只看到课程、拼课进度、登录/注册，不看到管理后台入口。</li>
+        <li><span class="success">通过</span> 游客可查看公开课程拼课进度和开课情况。</li>
+        <li><span class="success">通过</span> 普通用户登录后，可查看历史参加拼课、待拼课、待开课记录。</li>
+        <li><span class="success">通过</span> 普通用户可取消报名、修改资料、查看缴费状态，但不能个人线上付款。</li>
+        <li><span class="success">通过</span> 管理员、运营或老师可在后台维护缴费状态。</li>
+        <li><span class="success">通过</span> <code>admin.html</code> 独立运行，后台导航、样式、路由不依赖前台页面壳。</li>
+        <li><span class="success">通过</span> 管理员可新增、删除、禁用、修改全部账号；运营可管理老师和普通用户账号。</li>
+        <li><span class="success">通过</span> 后台可配置单个公众号扫码登录和邮箱验证码登录所需参数，管理员可决定启用哪些登录/注册方式。</li>
+        <li><span class="success">通过</span> 邮箱验证码有效期为 5 分钟。</li>
+        <li><span class="success">通过</span> 后台可维护完整 SEO 配置，并能影响前台页面 meta 信息、sitemap、robots 和分享信息。</li>
+        <li><span class="success">通过</span> 开课等级、等级标识、课程颜色和课程名称在创建课程时可配置，课程颜色由创建人自己设置。</li>
+        <li><span class="success">通过</span> 游客不展示详细隐私信息；登录用户可见微信但不可见隐私手机号；后台角色可见手机号。</li>
+      </ul>
+    </section>
+
+    <section id="questions">
+      <h2>10. 仍需确认的问题</h2>
+      <ul>
+        <li>暂无。当前版本可进入实施拆解阶段。</li>
+      </ul>
+    </section>
+  </main>
+</body>
+</html>

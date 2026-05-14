@@ -1,0 +1,437 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>管理后台拆分与认证体系实施拆解</title>
+  <style>
+    :root {
+      --bg: #f6f7f9;
+      --surface: #ffffff;
+      --text: #1f2937;
+      --muted: #667085;
+      --border: #e5e7eb;
+      --primary: #2563eb;
+      --primary-soft: #eff6ff;
+      --ok: #047857;
+      --warn: #b45309;
+      --danger: #b91c1c;
+      --shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      line-height: 1.65;
+    }
+
+    .shell {
+      width: min(1180px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 32px 0 56px;
+    }
+
+    header,
+    section {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--surface);
+      box-shadow: var(--shadow);
+    }
+
+    header { padding: 28px; }
+    section { margin-top: 16px; padding: 24px; }
+
+    .eyebrow {
+      margin: 0 0 8px;
+      color: var(--primary);
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    h1 { margin: 0; font-size: 30px; line-height: 1.25; }
+    h2 { margin: 0 0 12px; font-size: 22px; }
+    h3 { margin: 20px 0 8px; font-size: 17px; }
+    p { margin: 8px 0; }
+    ul, ol { margin: 8px 0 0; padding-left: 22px; }
+    li { margin: 6px 0; }
+
+    .summary {
+      max-width: 920px;
+      margin: 12px 0 0;
+      color: var(--muted);
+    }
+
+    nav {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 18px 0;
+    }
+
+    nav a {
+      display: inline-flex;
+      align-items: center;
+      min-height: 36px;
+      padding: 0 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--surface);
+      color: var(--primary);
+      text-decoration: none;
+      font-weight: 600;
+    }
+
+    table {
+      width: 100%;
+      margin-top: 12px;
+      border-collapse: collapse;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--surface);
+    }
+
+    th,
+    td {
+      padding: 12px;
+      border-bottom: 1px solid var(--border);
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      background: #f9fafb;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    tr:last-child td { border-bottom: 0; }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 12px;
+    }
+
+    .card {
+      padding: 16px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: #fbfcfe;
+    }
+
+    .card strong {
+      display: block;
+      margin-bottom: 6px;
+    }
+
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      min-height: 26px;
+      padding: 0 8px;
+      border-radius: 8px;
+      background: var(--primary-soft);
+      color: var(--primary);
+      font-size: 12px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .todo { color: var(--muted); font-weight: 700; }
+    .doing { color: var(--warn); font-weight: 700; }
+    .done { color: var(--ok); font-weight: 700; }
+    .blocked { color: var(--danger); font-weight: 700; }
+
+    code {
+      padding: 2px 5px;
+      border-radius: 6px;
+      background: #f3f4f6;
+      font-family: Consolas, "SFMono-Regular", monospace;
+      font-size: 0.95em;
+    }
+
+    .note {
+      padding: 12px 14px;
+      border-left: 4px solid var(--primary);
+      background: var(--primary-soft);
+      border-radius: 8px;
+      color: #1e3a8a;
+    }
+
+    @media (max-width: 900px) {
+      .grid { grid-template-columns: 1fr; }
+      header, section { padding: 18px; }
+      table { display: block; overflow-x: auto; }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header>
+      <p class="eyebrow">IMPLEMENTATION BREAKDOWN / PROGRESS TRACKER</p>
+      <h1>管理后台拆分与认证体系实施拆解</h1>
+      <p class="summary">
+        本文档把“管理后台与课程前台拆分、注册登录改造、账号权限、课程隐私、SEO 管理”拆成可独立开发、可自测、可验收、可提交的小功能。执行规则：每个小功能完成后独立 commit；每个大功能全部完成并通过验收后再做阶段汇总提交；每次提交后更新本进度文档。
+      </p>
+    </header>
+
+    <nav aria-label="文档导航">
+      <a href="#rules">执行规则</a>
+      <a href="#milestones">大功能拆分</a>
+      <a href="#feature-list">小功能清单</a>
+      <a href="#progress">进度</a>
+      <a href="#commit-plan">提交规范</a>
+      <a href="#next">下一步</a>
+    </nav>
+
+    <section id="rules">
+      <h2>1. 执行规则</h2>
+      <ul>
+        <li>每个小功能必须有明确范围、影响文件、自测项、验收标准。</li>
+        <li>每个小功能完成后单独 commit，commit message 使用 <code>type(scope): summary</code>。</li>
+        <li>大功能完成后做一次汇总检查，更新进度，再进行阶段提交。</li>
+        <li>任何需求不明确或存在分歧时先追问，不擅自扩大范围。</li>
+        <li>开发过程中保持前后端可启动，必要时记录无法验证的原因。</li>
+      </ul>
+      <p class="note">当前阶段启动提交只包含计划和拆解文档，不包含业务代码改动。</p>
+    </section>
+
+    <section id="milestones">
+      <h2>2. 大功能拆分</h2>
+      <div class="grid">
+        <div class="card">
+          <strong>F1 前后台隔离</strong>
+          独立 <code>admin.html</code>、后台路由、后台样式和前台入口隐藏。
+        </div>
+        <div class="card">
+          <strong>F2 登录注册体系</strong>
+          公众号单配置、邮箱验证码 5 分钟、用户名登录全开放。
+        </div>
+        <div class="card">
+          <strong>F3 用户中心与报名</strong>
+          我的报名、历史拼课、待拼课、待开课、取消和资料修改。
+        </div>
+        <div class="card">
+          <strong>F4 后台权限与账号</strong>
+          管理员管理全部账号，运营管理老师和普通用户。
+        </div>
+        <div class="card">
+          <strong>F5 课程字段与隐私</strong>
+          开课等级、标识、创建人颜色、课程名称、微信和手机号可见性。
+        </div>
+        <div class="card">
+          <strong>F6 SEO 管理</strong>
+          meta、分享信息、sitemap、robots、预览。
+        </div>
+      </div>
+    </section>
+
+    <section id="feature-list">
+      <h2>3. 小功能清单、自测与验收</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>小功能</th>
+            <th>范围</th>
+            <th>自测</th>
+            <th>验收标准</th>
+            <th>建议提交</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>F1.1</td>
+            <td>前台移除后台入口</td>
+            <td>前台导航只保留课程、我的报名、登录/注册或用户信息。</td>
+            <td>打开 <code>index.html#/public/classes</code>，检查游客和普通用户导航。</td>
+            <td>游客和普通用户看不到“管理后台”。手动访问后台路由不展示后台数据。</td>
+            <td><code>feat(frontend): hide admin entry from public app</code></td>
+          </tr>
+          <tr>
+            <td>F1.2</td>
+            <td>新增独立后台入口</td>
+            <td>新增 <code>admin.html</code>、后台 JS 入口、后台基础壳。</td>
+            <td>访问 <code>/admin.html#/login</code>，确认后台页面独立加载。</td>
+            <td>后台页面不依赖前台导航，刷新后路由仍可恢复。</td>
+            <td><code>feat(admin): add standalone admin shell</code></td>
+          </tr>
+          <tr>
+            <td>F1.3</td>
+            <td>后台路由守卫</td>
+            <td>后台登录态和角色校验；无权限提示。</td>
+            <td>游客、普通用户、后台角色分别访问后台路由。</td>
+            <td>游客跳后台登录；普通用户无权限；管理员、运营、老师可进入。</td>
+            <td><code>feat(admin): add role guarded routes</code></td>
+          </tr>
+          <tr>
+            <td>F2.1</td>
+            <td>认证配置模型</td>
+            <td>后端新增单公众号配置、邮箱配置、启用登录/注册方式配置。</td>
+            <td>运行后端测试；检查默认配置可读写。</td>
+            <td>管理员可保存并读取公众号、邮箱、启用方式配置。</td>
+            <td><code>feat(auth): add login method configuration</code></td>
+          </tr>
+          <tr>
+            <td>F2.2</td>
+            <td>邮箱验证码</td>
+            <td>邮箱验证码生成、5 分钟有效期、校验和错误提示。</td>
+            <td>测试有效验证码、过期验证码、错误验证码。</td>
+            <td>验证码 5 分钟内可用，过期后不可登录或注册。</td>
+            <td><code>feat(auth): support email verification codes</code></td>
+          </tr>
+          <tr>
+            <td>F2.3</td>
+            <td>用户名登录全开放</td>
+            <td>普通用户和后台用户均可用用户名登录；普通用户需先注册。</td>
+            <td>用普通用户、管理员、未注册用户分别尝试登录。</td>
+            <td>已注册普通用户可登录；后台用户可登录；未注册用户被拒绝。</td>
+            <td><code>feat(auth): allow username login for registered users</code></td>
+          </tr>
+          <tr>
+            <td>F2.4</td>
+            <td>扫码登录占位与配置</td>
+            <td>前端展示公众号扫码入口；后台配置单公众号参数。</td>
+            <td>关闭/开启扫码方式，检查登录页入口变化。</td>
+            <td>管理员禁用后不展示扫码入口；启用后展示二维码或配置提示。</td>
+            <td><code>feat(auth): add configurable qr login entry</code></td>
+          </tr>
+          <tr>
+            <td>F3.1</td>
+            <td>我的报名列表</td>
+            <td>展示历史拼课、待拼课、待开课、已取消、已完成。</td>
+            <td>用登录用户查看不同状态报名记录。</td>
+            <td>用户只能看到自己的报名和拼课记录。</td>
+            <td><code>feat(account): add registration history view</code></td>
+          </tr>
+          <tr>
+            <td>F3.2</td>
+            <td>报名资料修改与取消</td>
+            <td>支持修改资料、取消报名；受状态限制。</td>
+            <td>测试可取消、不可取消、可修改、不可修改状态。</td>
+            <td>状态限制正确；操作后列表和详情同步刷新。</td>
+            <td><code>feat(account): support registration updates</code></td>
+          </tr>
+          <tr>
+            <td>F3.3</td>
+            <td>缴费状态展示</td>
+            <td>普通用户只查看缴费状态，不能个人付款。</td>
+            <td>检查未缴、已缴、待确认等状态。</td>
+            <td>前台无付款入口；后台角色可维护缴费状态。</td>
+            <td><code>feat(registration): show payment status</code></td>
+          </tr>
+          <tr>
+            <td>F4.1</td>
+            <td>后台账号管理</td>
+            <td>管理员管理全部账号；运营管理老师和普通用户。</td>
+            <td>用管理员、运营、老师分别访问账号管理。</td>
+            <td>管理员权限最高；运营不能管理管理员；老师不能管理账号。</td>
+            <td><code>feat(admin): add account management</code></td>
+          </tr>
+          <tr>
+            <td>F5.1</td>
+            <td>课程等级与颜色</td>
+            <td>课程名称必填；创建人设置开课等级、标识、展示颜色。</td>
+            <td>创建/编辑课程，检查必填、颜色展示和列表同步。</td>
+            <td>课程名称不能为空；颜色按创建人设置展示。</td>
+            <td><code>feat(classes): add level marker and display color</code></td>
+          </tr>
+          <tr>
+            <td>F5.2</td>
+            <td>联系方式与隐私</td>
+            <td>微信号、手机号字段；游客、登录用户、后台角色可见性差异。</td>
+            <td>游客、普通用户、管理员、运营、老师分别查看课程详情。</td>
+            <td>游客不看详细隐私；登录用户可见微信不可见手机号；后台角色可见手机号。</td>
+            <td><code>feat(classes): enforce contact privacy rules</code></td>
+          </tr>
+          <tr>
+            <td>F6.1</td>
+            <td>SEO 配置管理</td>
+            <td>管理员配置标题、描述、关键词、分享信息、课程 meta 模板。</td>
+            <td>保存配置，刷新前台页面检查 meta 输出。</td>
+            <td>配置生效且只有管理员可完整管理。</td>
+            <td><code>feat(seo): add admin seo settings</code></td>
+          </tr>
+          <tr>
+            <td>F6.2</td>
+            <td>sitemap/robots/预览</td>
+            <td>生成或维护 <code>sitemap.xml</code>、<code>robots.txt</code>，提供预览。</td>
+            <td>访问 sitemap/robots；检查预览内容。</td>
+            <td>sitemap 和 robots 可访问；预览展示即将生效的 SEO 内容。</td>
+            <td><code>feat(seo): support sitemap robots and preview</code></td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="progress">
+      <h2>4. 当前进度</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>功能</th>
+            <th>状态</th>
+            <th>最近更新</th>
+            <th>下一步</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>需求计划 HTML</td>
+            <td><span class="done">已完成</span></td>
+            <td>已完成需求确认，待确认问题为暂无。</td>
+            <td>随阶段启动提交。</td>
+          </tr>
+          <tr>
+            <td>实施拆解 HTML</td>
+            <td><span class="doing">进行中</span></td>
+            <td>已创建小功能、自测、验收、提交清单。</td>
+            <td>提交后进入 F1.1。</td>
+          </tr>
+          <tr>
+            <td>F1 前后台隔离</td>
+            <td><span class="todo">未开始</span></td>
+            <td>等待阶段启动提交。</td>
+            <td>先做 F1.1 前台移除后台入口。</td>
+          </tr>
+          <tr>
+            <td>F2-F6</td>
+            <td><span class="todo">未开始</span></td>
+            <td>等待 F1 基础隔离完成。</td>
+            <td>按小功能顺序推进。</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="commit-plan">
+      <h2>5. 提交规范</h2>
+      <ul>
+        <li>小功能提交：只包含该小功能相关代码、测试和进度更新。</li>
+        <li>大功能汇总提交：只在同一个大功能内所有小功能完成、自测通过、验收标准满足后进行。</li>
+        <li>提交前检查：<code>git status --short</code>，确认没有混入无关文件。</li>
+        <li>提交后更新：在本文件“当前进度”中记录完成项、验证结果和下一步。</li>
+      </ul>
+    </section>
+
+    <section id="next">
+      <h2>6. 下一步执行顺序</h2>
+      <ol>
+        <li>提交阶段启动文档。</li>
+        <li>执行 F1.1：前台移除后台入口。</li>
+        <li>自测 F1.1，更新进度文档。</li>
+        <li>提交 F1.1 小功能。</li>
+        <li>继续 F1.2：新增独立后台入口。</li>
+      </ol>
+    </section>
+  </main>
+</body>
+</html>
