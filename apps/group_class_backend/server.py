@@ -13,6 +13,7 @@ from uuid import uuid4
 
 from apps.group_class_backend.audit.interface import NullAuditWriter
 from apps.group_class_backend.auth.configuration import AuthConfiguration, InMemoryAuthConfigurationRepository
+from apps.group_class_backend.auth.email_codes import InMemoryEmailVerificationCodeRepository
 from apps.group_class_backend.classes.controller import (
     approve_class_review,
     create_class_draft,
@@ -148,6 +149,7 @@ class AppState:
         self.audit_writer = NullAuditWriter()
         self.active_tokens: dict[str, dict[str, Any]] = {}
         self.auth_configuration_repository = InMemoryAuthConfigurationRepository()
+        self.email_code_repository = InMemoryEmailVerificationCodeRepository()
         self.sqlite_connection: sqlite3.Connection | None = None
 
         if self.storage == "sqlite":
@@ -385,6 +387,42 @@ class GroupClassRequestHandler(BaseHTTPRequestHandler):
                 }
                 self.state.active_tokens[token] = session
                 self._write_json(200, {"requestId": request_id, "code": ErrorCode.OK.value, "data": session})
+                return
+
+            if path == "/api/v1/auth/email-code/request":
+                body = self._read_json_body()
+                email = str(body.get("email") or "").strip()
+                ttl_seconds = self.state.auth_configuration_repository.get().email_code_ttl_seconds
+                verification = self.state.email_code_repository.issue(email, ttl_seconds)
+                self._write_json(
+                    200,
+                    {
+                        "requestId": request_id,
+                        "code": ErrorCode.OK.value,
+                        "data": {
+                            "email": verification.email,
+                            "expiresAt": verification.expires_at.isoformat(),
+                            "ttlSeconds": ttl_seconds,
+                            "debugCode": verification.code,
+                        },
+                    },
+                )
+                return
+
+            if path == "/api/v1/auth/email-code/verify":
+                body = self._read_json_body()
+                is_valid = self.state.email_code_repository.verify(
+                    str(body.get("email") or "").strip(),
+                    str(body.get("code") or "").strip(),
+                )
+                self._write_json(
+                    200,
+                    {
+                        "requestId": request_id,
+                        "code": ErrorCode.OK.value,
+                        "data": {"valid": is_valid},
+                    },
+                )
                 return
 
             if path.startswith("/api/v1/admin/"):
