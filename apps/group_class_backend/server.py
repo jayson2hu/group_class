@@ -33,6 +33,7 @@ from apps.group_class_backend.persistence.schema import apply_schema
 from apps.group_class_backend.registrations.controller import (
     get_registration_detail,
     list_registrations,
+    list_my_registrations,
     submit_registration,
     update_registration_notes,
     update_registration_status,
@@ -274,6 +275,19 @@ class GroupClassRequestHandler(BaseHTTPRequestHandler):
                 self._write_json(status, payload)
                 return
 
+            if path == "/api/v1/account/registrations":
+                session = self._require_admin_auth(request_id)
+                if session is None:
+                    return
+                payload = list_my_registrations(
+                    class_repository=self.state.class_repository,
+                    registration_repository=self.state.registration_repository,
+                    request_id=request_id,
+                    actor_id=str(session.get("actorId") or ""),
+                )
+                self._write_json(200, payload)
+                return
+
             if path == "/api/v1/admin/classes":
                 payload = list_classes(
                     repository=self.state.class_repository,
@@ -488,13 +502,17 @@ class GroupClassRequestHandler(BaseHTTPRequestHandler):
 
             if path == "/api/v1/public/registrations":
                 payload = self._read_json_body()
+                session = None
+                token = self._parse_bearer_token()
+                if token:
+                    session = self.state.active_tokens.get(token)
                 result = submit_registration(
                     payload=payload,
                     class_repository=self.state.class_repository,
                     registration_repository=self.state.registration_repository,
                     audit_writer=self.state.audit_writer,
                     request_id=request_id,
-                    actor_id=str(payload.get("actorId") or "u_public_visitor"),
+                    actor_id=str((session or {}).get("actorId") or payload.get("actorId") or "u_public_visitor"),
                     now=datetime.now(timezone.utc),
                 )
                 status = 400 if result.get("code") != ErrorCode.OK.value else 200

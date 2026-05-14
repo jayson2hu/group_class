@@ -209,6 +209,22 @@ def list_registrations(
     return success_response(request_id=request_id, data={"items": items})
 
 
+def list_my_registrations(
+    *,
+    class_repository: InMemoryClassRepository | SQLiteClassRepository,
+    registration_repository: InMemoryRegistrationRepository | SQLiteRegistrationRepository,
+    request_id: str,
+    actor_id: str,
+) -> dict[str, object]:
+    visible_classes = {group_class.class_id: group_class for group_class in class_repository.list()}
+    items = [
+        _serialize_registration_list_item(registration, visible_classes[registration.class_id])
+        for registration in registration_repository.list()
+        if registration.user_id == actor_id and registration.class_id in visible_classes
+    ]
+    return success_response(request_id=request_id, data={"items": items})
+
+
 def get_registration_detail(
     *,
     registration_id: str,

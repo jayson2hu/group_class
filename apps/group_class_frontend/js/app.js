@@ -85,9 +85,11 @@ function getActorContext() {
 
 function syncAdminNav() {
   const loginEntry = document.getElementById("login-entry");
+  const accountEntry = document.getElementById("account-entry");
   const inLoginPage = (window.location.hash || "").startsWith("#/login");
   const loggedIn = isLoggedIn();
   if (loginEntry) loginEntry.style.display = loggedIn ? "none" : "";
+  if (accountEntry) accountEntry.style.display = loggedIn && !inLoginPage ? "" : "none";
 }
 
 function syncNavState() {
@@ -101,6 +103,45 @@ function syncNavState() {
     if (isActive) link.setAttribute("aria-current", "page");
     else link.removeAttribute("aria-current");
   });
+}
+
+async function renderMyRegistrations() {
+  const result = await api.getMyRegistrations();
+  const items = result.items || [];
+  if (!items.length) {
+    setHtml(`
+      <section class="panel admin-hero">
+        <div><p class="section-kicker">My Registrations</p><h2>我的报名</h2><p class="muted admin-hero-text">登录后可查看历史拼课、待拼课和待开课记录。</p></div>
+      </section>
+      ${emptyStateHtml("暂无报名记录", "你还没有提交过报名、候补或试听申请。")}
+    `);
+    return;
+  }
+  const summary = { ENROLLMENT: 0, WAITLIST: 0, TRIAL: 0 };
+  items.forEach((item) => { if (summary[item.registerType] !== undefined) summary[item.registerType] += 1; });
+  const cards = items.map((item) => `
+    <article class="panel registration-card">
+      <div class="registration-card-head"><h3>${escapeHtml(item.className || "未命名课程")}</h3><div class="registration-card-chips">${registrationTypeChip(item.registerType)}${statusChip(item.registrationStatus, item.registrationStatus)}</div></div>
+      <dl class="registration-card-info">
+        <div><dt>学员</dt><dd>${escapeHtml(item.studentName || "-")}</dd></div>
+        <div><dt>年级</dt><dd>${escapeHtml(item.studentGrade || "-")}</dd></div>
+        <div><dt>家长</dt><dd>${escapeHtml(item.parentName || "-")}</dd></div>
+        <div><dt>提交时间</dt><dd>${escapeHtml(item.submittedAt || "-")}</dd></div>
+      </dl>
+    </article>
+  `).join("");
+  setHtml(`
+    <section class="panel admin-hero">
+      <div><p class="section-kicker">My Registrations</p><h2>我的报名</h2><p class="muted admin-hero-text">查看你参与过的拼课、候补和试听申请。</p></div>
+      <div class="admin-summary-grid registration-summary-grid">
+        <div class="summary-pill"><span class="summary-label">全部记录</span><strong class="summary-value">${items.length}</strong></div>
+        <div class="summary-pill"><span class="summary-label">报名</span><strong class="summary-value">${summary.ENROLLMENT}</strong></div>
+        <div class="summary-pill"><span class="summary-label">候补</span><strong class="summary-value">${summary.WAITLIST}</strong></div>
+        <div class="summary-pill"><span class="summary-label">试听</span><strong class="summary-value">${summary.TRIAL}</strong></div>
+      </div>
+    </section>
+    <section class="grid registration-card-grid">${cards}</section>
+  `);
 }
 
 function navigateTo(hash) {
@@ -895,6 +936,13 @@ async function renderRoute() {
       setHtml(loginPageHtml());
       bindLoginPage(queryParams);
       return;
+    }
+    if (parts[0] === "account" && parts[1] === "registrations") {
+      if (!isLoggedIn()) {
+        navigateTo(`#/login?next=${encodeURIComponent("#/account/registrations")}`);
+        return;
+      }
+      return await renderMyRegistrations();
     }
     if (parts[0] === "public" && parts[1] === "classes" && !parts[2]) return await renderPublicList();
     if (parts[0] === "public" && parts[1] === "classes" && parts[2]) return await renderPublicDetail(parts[2]);

@@ -253,8 +253,15 @@ export class ApiClient {
     }
     const result = await requestJson(`${this.baseUrl}/api/v1/public/registrations`, {
       method: "POST",
-      headers: this.buildHeaders({ "Content-Type": "application/json" }),
+      headers: this.buildHeaders({ "Content-Type": "application/json" }, true),
       body: JSON.stringify(payload),
+    });
+    return result.data || result;
+  }
+
+  async getMyRegistrations() {
+    const result = await requestJson(`${this.baseUrl}/api/v1/account/registrations`, {
+      headers: this.buildHeaders({}, true),
     });
     return result.data || result;
   }
