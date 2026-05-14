@@ -121,6 +121,11 @@ _PUBLIC_LIST_ITEM_FIELDS = (
     "updatedAt",
 )
 
+_PUBLIC_LIST_OPTIONAL_FIELDS = (
+    "wechatContact",
+    "phoneContact",
+)
+
 _PUBLIC_VISIBLE_STATUSES = {
     ClassStatus.OPEN_FOR_ENROLLMENT,
     ClassStatus.ALMOST_CONFIRMED,
@@ -221,9 +226,9 @@ def _primary_action(group_class: GroupClass) -> tuple[str, str]:
 
 
 
-def _serialize_public_class(group_class: GroupClass) -> dict[str, object]:
+def _serialize_public_class(group_class: GroupClass, viewer_scope: str = "visitor") -> dict[str, object]:
     primary_action, primary_action_label = _primary_action(group_class)
-    return {
+    data = {
         "classId": group_class.class_id,
         "className": group_class.class_name,
         "status": group_class.status.value,
@@ -243,8 +248,6 @@ def _serialize_public_class(group_class: GroupClass) -> dict[str, object]:
         "primaryActionLabel": primary_action_label,
         "isWaitlistAvailable": group_class.status in {ClassStatus.FULL, ClassStatus.WAITLIST_OPEN},
         "courseSubtitle": group_class.course_subtitle,
-        "wechatContact": group_class.wechat_contact,
-        "phoneContact": group_class.phone_contact,
         "targetAudience": group_class.target_audience,
         "unsuitableAudience": group_class.unsuitable_audience,
         "courseGoal": group_class.course_goal,
@@ -258,6 +261,11 @@ def _serialize_public_class(group_class: GroupClass) -> dict[str, object]:
         "actions": ["view"],
         "updatedAt": group_class.updated_at.isoformat(),
     }
+    if viewer_scope in {"user", "backoffice"}:
+        data["wechatContact"] = group_class.wechat_contact
+    if viewer_scope == "backoffice":
+        data["phoneContact"] = group_class.phone_contact
+    return data
 
 
 
@@ -717,13 +725,14 @@ def get_class_detail(
     repository: InMemoryClassRepository,
     request_id: str,
     public_only: bool = False,
+    viewer_scope: str = "visitor",
 ) -> dict[str, object]:
     group_class = repository.get(class_id)
     if group_class is None:
         return _not_found_error(request_id)
     if public_only and group_class.status not in _PUBLIC_VISIBLE_STATUSES:
         return _not_found_error(request_id)
-    data = _serialize_public_class(group_class) if public_only else _serialize_class(group_class)
+    data = _serialize_public_class(group_class, viewer_scope=viewer_scope) if public_only else _serialize_class(group_class)
     return success_response(request_id=request_id, data=data)
 
 
@@ -735,6 +744,7 @@ def list_classes(
     page: int,
     page_size: int,
     public_only: bool = False,
+    viewer_scope: str = "visitor",
 ) -> dict[str, object]:
     all_items = sorted(repository.list(), key=lambda item: item.updated_at, reverse=True)
     if public_only:
@@ -744,8 +754,14 @@ def list_classes(
     serialized_items = []
     for group_class in all_items[start:end]:
         if public_only:
-            public_item = _serialize_public_class(group_class)
-            serialized_items.append({field: public_item[field] for field in _PUBLIC_LIST_ITEM_FIELDS})
+            public_item = _serialize_public_class(group_class, viewer_scope=viewer_scope)
+            serialized_items.append(
+                {
+                    field: public_item[field]
+                    for field in (*_PUBLIC_LIST_ITEM_FIELDS, *_PUBLIC_LIST_OPTIONAL_FIELDS)
+                    if field in public_item
+                }
+            )
         else:
             full_item = _serialize_class(group_class)
             serialized_items.append({field: full_item[field] for field in _LIST_ITEM_FIELDS})

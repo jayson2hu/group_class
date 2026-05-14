@@ -220,6 +220,18 @@ class GroupClassRequestHandler(BaseHTTPRequestHandler):
         token = header[7:].strip()
         return token or None
 
+    def _viewer_scope_from_token(self) -> str:
+        token = self._parse_bearer_token()
+        if not token:
+            return "visitor"
+        session = self.state.active_tokens.get(token)
+        if session is None:
+            return "visitor"
+        roles = set(session.get("actorRoles") or [])
+        if roles.intersection({"ADMIN", "CLASS_ADMIN", "SUPER_ADMIN", "OPERATOR", "TEACHER"}):
+            return "backoffice"
+        return "user"
+
     def _require_admin_auth(self, request_id: str) -> dict[str, Any] | None:
         token = self._parse_bearer_token()
         if not token or token not in self.state.active_tokens:
@@ -286,6 +298,7 @@ class GroupClassRequestHandler(BaseHTTPRequestHandler):
                     page=1,
                     page_size=50,
                     public_only=True,
+                    viewer_scope=self._viewer_scope_from_token(),
                 )
                 self._write_json(200, payload)
                 return
@@ -297,6 +310,7 @@ class GroupClassRequestHandler(BaseHTTPRequestHandler):
                     repository=self.state.class_repository,
                     request_id=request_id,
                     public_only=True,
+                    viewer_scope=self._viewer_scope_from_token(),
                 )
                 status = 404 if payload.get("code") == ErrorCode.CLASS_NOT_FOUND.value else 200
                 self._write_json(status, payload)

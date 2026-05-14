@@ -1609,3 +1609,84 @@ def test_get_class_detail_returns_not_found() -> None:
         "code": ErrorCode.CLASS_NOT_FOUND,
         "details": [{"field": "classId", "message": "class not found"}],
     }
+
+
+def test_public_class_detail_hides_contacts_for_visitors() -> None:
+    repository = InMemoryClassRepository()
+    class_id = _seed_class(repository)
+    current = repository.get(class_id)
+    assert current is not None
+    repository.save(
+        replace(
+            current,
+            status=ClassStatus.OPEN_FOR_ENROLLMENT,
+            wechat_contact="teacher_wechat",
+            phone_contact="13800138000",
+        )
+    )
+
+    response = get_class_detail(
+        class_id=class_id,
+        repository=repository,
+        request_id="req-public-visitor-contact-001",
+        public_only=True,
+        viewer_scope="visitor",
+    )
+
+    assert response["code"] == ErrorCode.OK
+    assert "wechatContact" not in response["data"]
+    assert "phoneContact" not in response["data"]
+
+
+def test_public_class_detail_shows_wechat_only_for_logged_in_users() -> None:
+    repository = InMemoryClassRepository()
+    class_id = _seed_class(repository)
+    current = repository.get(class_id)
+    assert current is not None
+    repository.save(
+        replace(
+            current,
+            status=ClassStatus.OPEN_FOR_ENROLLMENT,
+            wechat_contact="teacher_wechat",
+            phone_contact="13800138000",
+        )
+    )
+
+    response = get_class_detail(
+        class_id=class_id,
+        repository=repository,
+        request_id="req-public-user-contact-001",
+        public_only=True,
+        viewer_scope="user",
+    )
+
+    assert response["code"] == ErrorCode.OK
+    assert response["data"]["wechatContact"] == "teacher_wechat"
+    assert "phoneContact" not in response["data"]
+
+
+def test_public_class_detail_shows_phone_for_backoffice_roles() -> None:
+    repository = InMemoryClassRepository()
+    class_id = _seed_class(repository)
+    current = repository.get(class_id)
+    assert current is not None
+    repository.save(
+        replace(
+            current,
+            status=ClassStatus.OPEN_FOR_ENROLLMENT,
+            wechat_contact="teacher_wechat",
+            phone_contact="13800138000",
+        )
+    )
+
+    response = get_class_detail(
+        class_id=class_id,
+        repository=repository,
+        request_id="req-public-backoffice-contact-001",
+        public_only=True,
+        viewer_scope="backoffice",
+    )
+
+    assert response["code"] == ErrorCode.OK
+    assert response["data"]["wechatContact"] == "teacher_wechat"
+    assert response["data"]["phoneContact"] == "13800138000"
