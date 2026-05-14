@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>拼课管理后台 - MVP</title>
+  <link rel="stylesheet" href="./css/styles.css?v=20260425a" />
+</head>
+<body>
+  <div class="page-shell admin-app-shell">
+    <header class="topbar">
+      <div class="topbar-inner container">
+        <div class="brand-block">
+          <span class="eyebrow">Group Class Admin</span>
+          <h1>拼课管理后台</h1>
+          <p>独立管理课程、报名、账号、配置和 SEO，不与课程报名入口混用。</p>
+        </div>
+        <div class="topbar-meta">
+          <span class="meta-pill">Admin</span>
+          <span class="meta-pill">Operations</span>
+          <span class="meta-pill">MVP</span>
+        </div>
+      </div>
+    </header>
+
+    <nav class="nav">
+      <div class="container nav-inner">
+        <div class="nav-group nav-admin" id="admin-nav">
+          <a href="#/classes" class="nav-link">课程管理</a>
+          <a href="#/registrations" class="nav-link">报名管理</a>
+          <a href="#/accounts" class="nav-link">账号管理</a>
+          <a href="#/seo" class="nav-link">SEO 管理</a>
+        </div>
+        <div class="nav-group">
+          <a href="#/login" class="nav-link" id="admin-login-entry">登录</a>
+          <button class="btn" id="admin-logout-btn" type="button" style="display:none">退出登录</button>
+        </div>
+      </div>
+    </nav>
+
+    <main id="admin-app" class="container page-content" aria-live="polite"></main>
+  </div>
+
+  <script type="module" src="./js/admin.js?v=20260514a"></script>
+</body>
+</html>
