@@ -28,6 +28,11 @@ function hasAdminRole() {
   return roles.some((role) => ADMIN_ROLES.has(role));
 }
 
+function getRoleText() {
+  const roles = getAuthUser()?.actorRoles || [];
+  return roles.length ? roles.join(", ") : "未登录";
+}
+
 function getHashPath() {
   return window.location.hash || "#/login";
 }
@@ -86,6 +91,17 @@ function loginHtml() {
   `;
 }
 
+function loginErrorHtml(message) {
+  return `
+    <section class="panel login-panel">
+      <p class="section-kicker">Admin Login</p>
+      <h2>管理后台登录</h2>
+      <p class="error">${escapeHtml(message)}</p>
+      <a class="btn" href="#/login">重新登录</a>
+    </section>
+  `;
+}
+
 function bindLogin() {
   const form = document.getElementById("admin-login-form");
   if (!form) return;
@@ -105,7 +121,7 @@ function bindLogin() {
       }
       navigateTo("#/classes");
     } catch (error) {
-      setHtml(unauthorizedHtml(error.message || "登录失败"));
+      setHtml(loginErrorHtml(error.message || "登录失败"));
     } finally {
       button.disabled = false;
       button.textContent = previous;
@@ -131,6 +147,7 @@ function placeholderHtml(title, description) {
         <p class="section-kicker">Admin Workspace</p>
         <h2>${escapeHtml(title)}</h2>
         <p class="muted admin-hero-text">${escapeHtml(description)}</p>
+        <p class="muted">当前角色：${escapeHtml(getRoleText())}</p>
       </div>
     </section>
   `;
