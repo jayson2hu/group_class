@@ -518,6 +518,39 @@ function enrollmentFormHtml(classId, registerType = "ENROLLMENT") {
   `;
 }
 
+function enrollmentSuccessSteps(registerType) {
+  const mapping = {
+    ENROLLMENT: {
+      title: "报名提交成功",
+      intro: "当前为报名申请，名额需等待运营/老师人工确认后锁定。",
+      steps: [
+        ["已收到报名申请", "系统已记录家长和学员信息。"],
+        ["等待人工确认", "运营/老师会核对名额、时间和缴费安排。"],
+        ["确认后通知安排", "确认成功后会通过联系方式同步上课和付款信息。"],
+      ],
+    },
+    WAITLIST: {
+      title: "候补提交成功",
+      intro: "当前为候补申请，有空位或相近课程时会再通知确认。",
+      steps: [
+        ["已进入候补队列", "系统已记录候补意向和可接受推荐设置。"],
+        ["等待空位释放", "运营会按候补顺序或课程匹配情况跟进。"],
+        ["有机会后通知", "出现空位或相近课程时会联系确认是否转入。"],
+      ],
+    },
+    TRIAL: {
+      title: "试听申请成功",
+      intro: "当前为试听申请，老师/运营会先确认试听时间和适配情况。",
+      steps: [
+        ["已收到试听申请", "系统已记录学员基础和联系方式。"],
+        ["老师/运营确认", "会进一步确认试听时间、课程适配度和准备事项。"],
+        ["确认后安排试听", "确认成功后会通知试听入口、时间和后续报名方式。"],
+      ],
+    },
+  };
+  return mapping[registerType] || mapping.ENROLLMENT;
+}
+
 async function renderEnrollmentSuccess(result, classId) {
   let classDetail = null;
   try {
@@ -525,22 +558,34 @@ async function renderEnrollmentSuccess(result, classId) {
   } catch {
     classDetail = null;
   }
+  const registerType = result.registerType || "ENROLLMENT";
+  const successContent = enrollmentSuccessSteps(registerType);
   const progressText = classDetail?.progressText || "请保持电话畅通，便于及时确认班级安排。";
-  const waitlistNotice = ["FULL", "WAITLIST_OPEN"].includes(result.classStatus)
+  const waitlistNotice = registerType === "WAITLIST" || ["FULL", "WAITLIST_OPEN"].includes(result.classStatus)
     ? '<p class="muted">您已加入候补，如有空位将尽快通知。</p>'
     : "";
   setHtml(`
     <section class="panel success-hero">
       <div class="success-icon" aria-hidden="true"></div>
-      <h2>报名提交成功</h2>
+      <h2>${successContent.title}</h2>
       <p class="muted">报名编号：${result.registrationId || "-"}</p>
     </section>
     <section class="success-grid">
-      <article class="panel success-card"><h3>报名信息</h3><p><strong>报名类型：</strong>${registrationTypeLabel(result.registerType)}</p><p><strong>报名状态：</strong>${result.registrationStatus || "-"}</p><p><strong>课程状态：</strong>${classStatusLabel(result.classStatus)}</p></article>
-      <article class="panel success-card"><h3>后续说明</h3><p>${result.nextStepText || "提交成功，老师/运营将尽快联系确认。"}</p><p class="muted">${progressText}</p>${waitlistNotice}</article>
+      <article class="panel success-card"><h3>报名信息</h3><p><strong>报名类型：</strong>${registrationTypeLabel(registerType)}</p><p><strong>报名状态：</strong>${result.registrationStatus || "-"}</p><p><strong>课程状态：</strong>${classStatusLabel(result.classStatus)}</p></article>
+      <article class="panel success-card"><h3>后续说明</h3><p>${successContent.intro}</p><p class="muted">${result.nextStepText || "提交成功，老师/运营将尽快联系确认。"}</p><p class="muted">${progressText}</p>${waitlistNotice}</article>
     </section>
-    <section class="panel success-actions"><div class="actions"><a class="btn primary" href="#/public/classes">返回看板</a><a class="btn" href="#/public/classes/${classId}">查看课程详情</a></div></section>
+    <section class="panel success-process">
+      <h3>后续流程</h3>
+      <div class="success-step-list">${successContent.steps.map(([title, text], index) => `<div class="success-step"><span>${index + 1}</span><div><strong>${title}</strong><p class="muted">${text}</p></div></div>`).join("")}</div>
+    </section>
+    <section class="panel success-actions"><div class="actions"><a class="btn primary" href="#/public/classes">返回看板</a><a class="btn" href="#/public/classes/${classId}">查看课程详情</a><button id="copy-class-link-btn" type="button" class="btn">复制课程链接</button></div></section>
   `);
+  const copyButton = document.getElementById("copy-class-link-btn");
+  copyButton?.addEventListener("click", async () => {
+    const url = `${window.location.origin}${window.location.pathname}#/public/classes/${classId}`;
+    const copied = await copyText(url);
+    showToast(copied ? "课程链接已复制" : "复制失败，请手动复制地址栏链接", copied ? "success" : "error");
+  });
 }
 
 function bindEnrollmentSubmit(classId, registerType) {

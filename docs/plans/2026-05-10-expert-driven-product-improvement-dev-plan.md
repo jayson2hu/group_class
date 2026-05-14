@@ -488,7 +488,7 @@ uv run pytest tests/ -q
 | X6 | 移动端体验报告 | ✅ 已完成 | 文档 review | - |
 | X7 | 问题池合并和优先级排序 | ✅ 已完成 | 文档 review | - |
 | K1 | 前台课程卡片决策信息增强 | ✅ 已完成 | `node --check app.js`; `node --check api.js`; `uv run pytest tests/ -q` 149 passed | `feat: improve public class cards` |
-| K2 | 报名成功页后续预期增强 | ✅ 已确认 | - | - |
+| K2 | 报名成功页后续预期增强 | ✅ 已完成 | `node --check app.js`; `node --check api.js`; `uv run pytest tests/ -q` 149 passed | `feat: clarify registration success next steps` |
 | K3 | 候补成功预期增强 | ✅ 已确认 | - | - |
 | K4 | 报名列表状态筛选和待跟进视图 | ✅ 已确认 | - | - |
 | K5 | 发布前课程完整性校验 | ✅ 已确认 | - | - |
@@ -508,6 +508,19 @@ uv run pytest tests/ -q
   - `node --check apps/group_class_frontend/js/api.js`
   - `/Users/fayun/.local/bin/uv run pytest tests/ -q`（149 passed）
 - Commit：`feat: improve public class cards`
+
+### K2 完成记录（2026-05-13）
+
+- 报名成功页新增“后续流程”三步说明。
+- `ENROLLMENT` 明确当前只是报名申请，需要等待人工确认后锁位。
+- `WAITLIST` 明确已进入候补，有空位或相近课程时再通知。
+- `TRIAL` 明确老师/运营会联系确认试听时间和适配情况。
+- 成功页保留返回看板、查看课程详情，并新增复制课程链接动作。
+- 自测：
+  - `node --check apps/group_class_frontend/js/app.js`
+  - `node --check apps/group_class_frontend/js/api.js`
+  - `/Users/fayun/.local/bin/uv run pytest tests/ -q`（149 passed）
+- Commit：`feat: clarify registration success next steps`
 
 ## 8. 验收口径
 
