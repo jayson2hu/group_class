@@ -161,6 +161,14 @@ function mockActionsByStatus(status) {
 
 const ERROR_MAP = {
   "className or templateId is required": "课程名称或模板 ID 为必填",
+  "className is required before submitting review": "提交审核前请填写课程名称",
+  "priceAmount is required before submitting review": "提交审核前请填写课程价格",
+  "minStudents is required before submitting review": "提交审核前请填写最少人数",
+  "maxStudents is required before submitting review": "提交审核前请填写最多人数",
+  "scheduleSummary is required before submitting review": "提交审核前请填写上课安排",
+  "targetAudience is required before submitting review": "提交审核前请填写适合对象",
+  "courseGoal is required before submitting review": "提交审核前请填写课程目标",
+  "groupRule is required before submitting review": "提交审核前请填写拼班规则",
   "version does not match current resource": "课程已被他人修改，请刷新后重试",
   "only DRAFT or REJECTED classes can be submitted for review": "仅草稿或已驳回课程可提交审核",
   "only PENDING_REVIEW classes can be approved": "仅待审核课程可审核通过",

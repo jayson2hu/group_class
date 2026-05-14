@@ -4,7 +4,16 @@ from __future__ import annotations
 def _create_class(client, headers: dict[str, str], class_name: str = "API 测试课") -> dict:
     response = client.post(
         "/api/v1/admin/classes",
-        json={"className": class_name, "minStudents": 3, "maxStudents": 10},
+        json={
+            "className": class_name,
+            "priceAmount": 399,
+            "minStudents": 3,
+            "maxStudents": 10,
+            "scheduleSummary": "每周六 10:00-11:30",
+            "targetAudience": "三至四年级学员",
+            "courseGoal": "提升阅读理解能力",
+            "groupRule": "满 3 人开班",
+        },
         headers=headers,
     )
     assert response.status_code == 200
@@ -234,6 +243,28 @@ def test_full_review_workflow(client, initiator_headers, admin_headers):
     assert submitted["status"] == "PENDING_REVIEW"
     assert approved["status"] == "OPEN_FOR_ENROLLMENT"
     assert approved["reviewerId"] == admin_headers["X-Actor-Id"]
+
+
+def test_submit_review_rejects_incomplete_class(client, initiator_headers):
+    """TC-C11A: 信息不完整课程不能提交审核。"""
+
+    response = client.post(
+        "/api/v1/admin/classes",
+        json={"className": "信息不完整课程", "minStudents": 3},
+        headers=initiator_headers,
+    )
+    created = response.json()["data"]
+
+    submit_response = client.post(
+        f"/api/v1/admin/classes/{created['classId']}/submit-review",
+        json={"version": created["version"]},
+        headers=initiator_headers,
+    )
+    details = submit_response.json()["details"]
+
+    assert submit_response.status_code == 400
+    assert any(detail["field"] == "priceAmount" for detail in details)
+    assert any(detail["field"] == "targetAudience" for detail in details)
 
 
 def test_approved_class_is_visible_publicly(client, initiator_headers, admin_headers):

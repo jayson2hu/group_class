@@ -23,6 +23,17 @@ _CANCELLABLE_STATUSES = {
     ClassStatus.IN_PROGRESS,
 }
 
+_REVIEW_REQUIRED_FIELDS: dict[str, str] = {
+    "className": "class_name",
+    "priceAmount": "price_amount",
+    "minStudents": "min_students",
+    "maxStudents": "max_students",
+    "scheduleSummary": "schedule_summary",
+    "targetAudience": "target_audience",
+    "courseGoal": "course_goal",
+    "groupRule": "group_rule",
+}
+
 
 class TemplateRepository(Protocol):
     def get(self, template_id: str) -> ClassTemplate | None: ...
@@ -314,6 +325,21 @@ def _template_inactive_error(request_id: str) -> dict[str, object]:
     )
 
 
+def _class_review_readiness_error(request_id: str, current: GroupClass) -> dict[str, object] | None:
+    details = []
+    for api_field, model_field in _REVIEW_REQUIRED_FIELDS.items():
+        value = getattr(current, model_field)
+        if value is None or (isinstance(value, str) and not value.strip()):
+            details.append({"field": api_field, "message": f"{api_field} is required before submitting review"})
+    if not details:
+        return None
+    return error_response(
+        request_id=request_id,
+        code=ErrorCode.VALIDATION_INVALID_ARGUMENT,
+        details=details,
+    )
+
+
 
 def _apply_template_default(
     resolved_payload: dict[str, object], api_field: str, template_value: object
@@ -583,6 +609,10 @@ def submit_class_review(
             code=ErrorCode.VALIDATION_INVALID_ARGUMENT,
             details=[{"field": "status", "message": "only DRAFT or REJECTED classes can be submitted for review"}],
         )
+
+    readiness_error = _class_review_readiness_error(request_id, current)
+    if readiness_error is not None:
+        return readiness_error
 
     candidate = replace(current, status=ClassStatus.PENDING_REVIEW, updated_at=now)
     saved = repository.update(candidate)

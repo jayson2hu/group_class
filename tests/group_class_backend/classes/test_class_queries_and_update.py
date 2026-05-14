@@ -61,6 +61,11 @@ def _seed_class(repository: InMemoryClassRepository | SQLiteClassRepository) -> 
             "className": "周末拼课",
             "priceAmount": 299,
             "minStudents": 6,
+            "maxStudents": 12,
+            "scheduleSummary": "每周六 10:00-11:30",
+            "targetAudience": "三至四年级学员",
+            "courseGoal": "提升阅读理解能力",
+            "groupRule": "满 6 人开班",
         },
         repository=repository,
         audit_writer=NullAuditWriter(),
@@ -398,6 +403,32 @@ def test_submit_class_review_transitions_draft_to_pending_review() -> None:
     assert response["data"]["status"] == ClassStatus.PENDING_REVIEW
     assert response["data"]["version"] == 2
     assert response["data"]["actions"] == ["view"]
+
+
+def test_submit_class_review_rejects_incomplete_class() -> None:
+    repository = InMemoryClassRepository()
+    response = create_class_draft(
+        payload={"className": "信息不完整课程", "minStudents": 4},
+        repository=repository,
+        audit_writer=NullAuditWriter(),
+        request_id="req-create-incomplete-review-001",
+        actor_id="initiator-001",
+        now=datetime(2026, 4, 12, 12, 0, tzinfo=timezone.utc),
+    )
+
+    submit_response = submit_class_review(
+        class_id=response["data"]["classId"],
+        payload={"version": 1},
+        repository=repository,
+        audit_writer=NullAuditWriter(),
+        request_id="req-submit-review-incomplete-001",
+        actor_id="initiator-001",
+        now=datetime(2026, 4, 12, 13, 30, tzinfo=timezone.utc),
+    )
+
+    assert submit_response["code"] == ErrorCode.VALIDATION_INVALID_ARGUMENT
+    missing_fields = {detail["field"] for detail in submit_response["details"]}
+    assert {"priceAmount", "maxStudents", "scheduleSummary", "targetAudience", "courseGoal", "groupRule"}.issubset(missing_fields)
 
 
 
@@ -1405,8 +1436,11 @@ def test_get_class_detail_public_only_returns_detail_content_from_sqlite_reposit
     created = create_class_draft(
         payload={
             "className": "寒假阅读班",
+            "priceAmount": 499,
             "minStudents": 6,
+            "maxStudents": 12,
             "courseSubtitle": "阅读专项提升",
+            "scheduleSummary": "每周六 10:00-11:30",
             "targetAudience": "适合四至六年级",
             "courseGoal": "提升阅读理解能力",
             "groupRule": "满 6 人开班",

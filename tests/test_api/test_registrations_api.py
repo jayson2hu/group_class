@@ -15,7 +15,16 @@ def approved_class_id(client, initiator_headers, admin_headers) -> str:
 
     created = client.post(
         "/api/v1/admin/classes",
-        json={"className": "报名测试课", "minStudents": 3, "maxStudents": 10},
+        json={
+            "className": "报名测试课",
+            "priceAmount": 399,
+            "minStudents": 3,
+            "maxStudents": 10,
+            "scheduleSummary": "每周六 10:00-11:30",
+            "targetAudience": "三至四年级学员",
+            "courseGoal": "提升阅读理解能力",
+            "groupRule": "满 3 人开班",
+        },
         headers=initiator_headers,
     ).json()["data"]
     submitted = client.post(

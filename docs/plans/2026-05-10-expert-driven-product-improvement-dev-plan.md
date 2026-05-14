@@ -491,7 +491,7 @@ uv run pytest tests/ -q
 | K2 | 报名成功页后续预期增强 | ✅ 已完成 | `node --check app.js`; `node --check api.js`; `uv run pytest tests/ -q` 149 passed | `feat: clarify registration success next steps` |
 | K3 | 候补成功预期增强 | ✅ 已完成 | `pytest registrations` 37 passed; `node --check app.js/api.js`; `uv run pytest tests/ -q` 149 passed | `feat: show waitlist position after submit` |
 | K4 | 报名列表状态筛选和待跟进视图 | ✅ 已完成 | `pytest test_registrations_api.py` 20 passed; `node --check app.js/api.js`; `uv run pytest tests/ -q` 152 passed | `feat: filter admin registrations` |
-| K5 | 发布前课程完整性校验 | ✅ 已确认 | - | - |
+| K5 | 发布前课程完整性校验 | ✅ 已完成 | `pytest classes/registrations` 92 passed; `node --check app.js/api.js`; `uv run pytest tests/ -q` 154 passed | `feat: validate class readiness before review` |
 
 ---
 
@@ -548,6 +548,19 @@ uv run pytest tests/ -q
   - `/Users/fayun/.local/bin/uv run pytest tests/test_api/test_registrations_api.py -q`（20 passed）
   - `/Users/fayun/.local/bin/uv run pytest tests/ -q`（152 passed）
 - Commit：`feat: filter admin registrations`
+
+### K5 完成记录（2026-05-13）
+
+- `submit_class_review` 新增发布前完整性校验，缺关键字段时返回 400。
+- 校验字段：`className`、`priceAmount`、`minStudents`、`maxStudents`、`scheduleSummary`、`targetAudience`、`courseGoal`、`groupRule`。
+- 错误 `details` 按缺失字段逐项返回，前端错误翻译补充中文提示。
+- 课程与 API 测试补充“信息不完整不能提交审核”和“完整课程可正常提交审核”覆盖。
+- 自测：
+  - `node --check apps/group_class_frontend/js/app.js`
+  - `node --check apps/group_class_frontend/js/api.js`
+  - `/Users/fayun/.local/bin/uv run pytest tests/group_class_backend/classes/test_class_queries_and_update.py tests/test_api/test_classes_api.py tests/test_api/test_registrations_api.py -q`（92 passed）
+  - `/Users/fayun/.local/bin/uv run pytest tests/ -q`（154 passed）
+- Commit：`feat: validate class readiness before review`
 
 ## 8. 验收口径
 
