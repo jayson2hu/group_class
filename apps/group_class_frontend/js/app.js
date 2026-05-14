@@ -231,6 +231,55 @@ function bindAdminClassFilters() {
   });
 }
 
+function readRegistrationFilters(queryParams) {
+  return {
+    registerType: queryParams.get("registerType") || "",
+    registrationStatus: queryParams.get("registrationStatus") || "",
+    keyword: queryParams.get("keyword") || "",
+  };
+}
+
+function registrationStatusLabel(status) {
+  const mapping = {
+    SUBMITTED: "待确认",
+    VALID: "有效",
+    INVALID: "无效",
+    WAITLISTED: "候补中",
+    CANCELLED: "已取消",
+  };
+  return mapping[status] || status || "-";
+}
+
+function registrationFilterHtml(filters) {
+  const types = ["ENROLLMENT", "WAITLIST", "TRIAL"];
+  const statuses = ["SUBMITTED", "VALID", "WAITLISTED", "INVALID", "CANCELLED"];
+  return `
+    <form id="admin-registration-filter-form" class="panel filter-bar registration-filter-bar">
+      <div class="row"><label>报名类型</label><select name="registerType"><option value="">全部类型</option>${types.map((type) => `<option value="${type}" ${filters.registerType === type ? "selected" : ""}>${registrationTypeLabel(type)}</option>`).join("")}</select></div>
+      <div class="row"><label>报名状态</label><select name="registrationStatus"><option value="">全部状态</option>${statuses.map((status) => `<option value="${status}" ${filters.registrationStatus === status ? "selected" : ""}>${registrationStatusLabel(status)}</option>`).join("")}</select></div>
+      <div class="row"><label>关键词</label><input name="keyword" value="${filters.keyword}" placeholder="家长 / 学员 / 课程" /></div>
+      <div class="actions filter-actions"><button type="submit" class="primary">筛选</button><a class="btn" href="#/admin/registrations">重置</a></div>
+    </form>
+  `;
+}
+
+function bindAdminRegistrationFilters() {
+  const form = document.getElementById("admin-registration-filter-form");
+  if (!form) return;
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const fd = new FormData(form);
+    const params = new URLSearchParams();
+    const registerType = String(fd.get("registerType") || "").trim();
+    const registrationStatus = String(fd.get("registrationStatus") || "").trim();
+    const keyword = String(fd.get("keyword") || "").trim();
+    if (registerType) params.set("registerType", registerType);
+    if (registrationStatus) params.set("registrationStatus", registrationStatus);
+    if (keyword) params.set("keyword", keyword);
+    window.location.hash = params.toString() ? `#/admin/registrations?${params.toString()}` : "#/admin/registrations";
+  });
+}
+
 function parseIsoOrNull(value) {
   const text = String(value || "").trim();
   return text ? new Date(text).toISOString() : null;
@@ -1093,11 +1142,16 @@ async function renderAdminClasses(queryParams = new URLSearchParams()) {
 
 async function renderAdminRegistrations(queryParams = new URLSearchParams()) {
   const page = readPage(queryParams);
-  const result = await api.getAdminRegistrations(page, LIST_PAGE_SIZE);
+  const filters = readRegistrationFilters(queryParams);
+  const result = await api.getAdminRegistrations(page, LIST_PAGE_SIZE, filters);
   const items = result.items || [];
   const total = result.total ?? items.length;
+  const pageParams = new URLSearchParams(queryParams);
+  pageParams.delete("page");
+  const pageBaseHash = pageParams.toString() ? `#/admin/registrations?${pageParams.toString()}` : "#/admin/registrations";
   if (!items.length) {
-    setHtml(`<section class="panel admin-hero"><div><p class="section-kicker">Admin Registrations</p><h2>报名管理</h2></div></section>${emptyStateHtml("暂无报名", "当前暂无报名记录。")}`);
+    setHtml(`<section class="panel admin-hero"><div><p class="section-kicker">Admin Registrations</p><h2>报名管理</h2></div></section>${registrationFilterHtml(filters)}${emptyStateHtml("暂无报名", "当前条件下没有报名记录。")}`);
+    bindAdminRegistrationFilters();
     return;
   }
   const summary = { ENROLLMENT: 0, WAITLIST: 0, TRIAL: 0 };
@@ -1124,9 +1178,11 @@ async function renderAdminRegistrations(queryParams = new URLSearchParams()) {
         <div class="summary-pill"><button id="registration-export-btn" type="button" class="btn primary">导出 CSV</button></div>
       </div>
     </section>
+    ${registrationFilterHtml(filters)}
     <section class="grid registration-card-grid">${cards}</section>
-    ${paginationHtml("#/admin/registrations", page, LIST_PAGE_SIZE, total)}
+    ${paginationHtml(pageBaseHash, page, LIST_PAGE_SIZE, total)}
   `);
+  bindAdminRegistrationFilters();
   bindRegistrationExport();
 }
 

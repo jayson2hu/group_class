@@ -181,6 +181,61 @@ def test_admin_registration_list_contains_pagination_fields(client, approved_cla
     assert len(data["items"]) == 1
 
 
+def test_admin_registration_list_filters_by_register_type(client, approved_class_id, public_headers, admin_headers):
+    """TC-R09A: 后台报名列表支持 registerType 筛选。"""
+
+    _submit_enrollment(client, approved_class_id, public_headers)
+    class_id = _public_class_id(client, "FULL")
+    client.post(
+        "/api/v1/public/registrations",
+        json={
+            "classId": class_id,
+            "registerType": "WAITLIST",
+            "parentName": "李四",
+            "contactInfo": "13900139000",
+            "studentGrade": "四年级",
+        },
+        headers=public_headers,
+    )
+
+    response = client.get("/api/v1/admin/registrations?registerType=WAITLIST", headers=admin_headers)
+    data = response.json()["data"]
+
+    assert response.status_code == 200
+    assert data["total"] == 1
+    assert data["items"][0]["registerType"] == "WAITLIST"
+
+
+def test_admin_registration_list_filters_by_registration_status(client, approved_class_id, public_headers, admin_headers):
+    """TC-R09B: 后台报名列表支持 registrationStatus 筛选。"""
+
+    registration = _submit_enrollment(client, approved_class_id, public_headers)
+    client.post(
+        f"/api/v1/admin/registrations/{registration['registrationId']}/status",
+        json={"registrationStatus": "VALID"},
+        headers=admin_headers,
+    )
+
+    response = client.get("/api/v1/admin/registrations?registrationStatus=VALID", headers=admin_headers)
+    data = response.json()["data"]
+
+    assert response.status_code == 200
+    assert data["total"] == 1
+    assert data["items"][0]["registrationStatus"] == "VALID"
+
+
+def test_admin_registration_list_filters_by_keyword(client, approved_class_id, public_headers, admin_headers):
+    """TC-R09C: 后台报名列表 keyword 可匹配课程名或家长名。"""
+
+    _submit_enrollment(client, approved_class_id, public_headers)
+
+    by_class = client.get("/api/v1/admin/registrations?keyword=报名测试课", headers=admin_headers).json()["data"]
+    by_parent = client.get("/api/v1/admin/registrations?keyword=张三", headers=admin_headers).json()["data"]
+
+    assert by_class["total"] == 1
+    assert by_parent["total"] == 1
+
+
 def test_admin_registration_export_csv(client, approved_class_id, public_headers, admin_headers):
     """TC-R10: 后台报名导出返回 CSV 文件。"""
 

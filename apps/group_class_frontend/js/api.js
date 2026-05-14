@@ -556,11 +556,22 @@ export class ApiClient {
     return result.data || result;
   }
 
-  async getAdminRegistrations(page = 1, pageSize = 20) {
+  async getAdminRegistrations(page = 1, pageSize = 20, filters = {}) {
     if (this.useMockData) {
-      return toPageResult([...mockRegistrations], page, pageSize);
+      let source = [...mockRegistrations];
+      if (filters.registerType) {
+        source = source.filter((item) => item.registerType === filters.registerType);
+      }
+      if (filters.registrationStatus) {
+        source = source.filter((item) => item.registrationStatus === filters.registrationStatus);
+      }
+      if (filters.keyword) {
+        const keyword = String(filters.keyword).toLowerCase();
+        source = source.filter((item) => [item.parentName, item.studentName, item.className].some((value) => String(value || "").toLowerCase().includes(keyword)));
+      }
+      return toPageResult(source, page, pageSize);
     }
-    const result = await requestJson(buildPagedUrl(`${this.baseUrl}/api/v1/admin/registrations`, page, pageSize), {}, this.actorId, this.actorRoles);
+    const result = await requestJson(buildPagedUrl(`${this.baseUrl}/api/v1/admin/registrations`, page, pageSize, filters), {}, this.actorId, this.actorRoles);
     return result.data || result;
   }
 

@@ -490,7 +490,7 @@ uv run pytest tests/ -q
 | K1 | 前台课程卡片决策信息增强 | ✅ 已完成 | `node --check app.js`; `node --check api.js`; `uv run pytest tests/ -q` 149 passed | `feat: improve public class cards` |
 | K2 | 报名成功页后续预期增强 | ✅ 已完成 | `node --check app.js`; `node --check api.js`; `uv run pytest tests/ -q` 149 passed | `feat: clarify registration success next steps` |
 | K3 | 候补成功预期增强 | ✅ 已完成 | `pytest registrations` 37 passed; `node --check app.js/api.js`; `uv run pytest tests/ -q` 149 passed | `feat: show waitlist position after submit` |
-| K4 | 报名列表状态筛选和待跟进视图 | ✅ 已确认 | - | - |
+| K4 | 报名列表状态筛选和待跟进视图 | ✅ 已完成 | `pytest test_registrations_api.py` 20 passed; `node --check app.js/api.js`; `uv run pytest tests/ -q` 152 passed | `feat: filter admin registrations` |
 | K5 | 发布前课程完整性校验 | ✅ 已确认 | - | - |
 
 ---
@@ -534,6 +534,20 @@ uv run pytest tests/ -q
   - `/Users/fayun/.local/bin/uv run pytest tests/group_class_backend/registrations/test_registration_commands.py tests/test_api/test_registrations_api.py -q`（37 passed）
   - `/Users/fayun/.local/bin/uv run pytest tests/ -q`（149 passed）
 - Commit：`feat: show waitlist position after submit`
+
+### K4 完成记录（2026-05-13）
+
+- `GET /api/v1/admin/registrations` 支持 `registerType`、`registrationStatus`、`keyword` 筛选。
+- keyword 支持匹配家长名、学员名、课程名。
+- 后台报名列表新增筛选栏，筛选条件写入 hash query，分页保留当前筛选条件。
+- mock 报名列表同步支持相同筛选逻辑。
+- API 测试覆盖报名类型、报名状态、关键词筛选。
+- 自测：
+  - `node --check apps/group_class_frontend/js/app.js`
+  - `node --check apps/group_class_frontend/js/api.js`
+  - `/Users/fayun/.local/bin/uv run pytest tests/test_api/test_registrations_api.py -q`（20 passed）
+  - `/Users/fayun/.local/bin/uv run pytest tests/ -q`（152 passed）
+- Commit：`feat: filter admin registrations`
 
 ## 8. 验收口径
 

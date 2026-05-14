@@ -1049,6 +1049,10 @@ button:disabled {
   margin: 0;
 }
 
+.registration-filter-bar {
+  grid-template-columns: minmax(150px, 0.8fr) minmax(150px, 0.8fr) minmax(220px, 1.2fr) auto;
+}
+
 form {
   display: grid;
   gap: 14px;

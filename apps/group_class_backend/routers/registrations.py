@@ -66,6 +66,9 @@ def admin_list_registrations(
     page: int = 1,
     page_size: int = 20,
     page_size_camel: int | None = Query(default=None, alias="pageSize"),
+    registration_status: str | None = Query(default=None, alias="registrationStatus"),
+    register_type: str | None = Query(default=None, alias="registerType"),
+    keyword: str | None = None,
     actor: ActorContext = Depends(get_actor),
 ) -> dict[str, object]:
     state = get_state()
@@ -77,6 +80,9 @@ def admin_list_registrations(
         actor_roles=actor.actor_roles,
         page=page,
         page_size=_effective_page_size(page_size, page_size_camel),
+        registration_status=registration_status,
+        register_type=register_type,
+        keyword=keyword,
     )
     response.status_code = _http_status(result)
     return result

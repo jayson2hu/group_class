@@ -154,6 +154,30 @@ def _visible_registration_items(
     return items
 
 
+def _filter_registration_items(
+    items: list[dict[str, object]],
+    *,
+    registration_status: str | None = None,
+    register_type: str | None = None,
+    keyword: str | None = None,
+) -> list[dict[str, object]]:
+    filtered = items
+    if registration_status:
+        filtered = [item for item in filtered if item["registrationStatus"] == registration_status]
+    if register_type:
+        filtered = [item for item in filtered if item["registerType"] == register_type]
+    if keyword:
+        normalized = keyword.strip().lower()
+        if normalized:
+            searchable_fields = ("parentName", "studentName", "className")
+            filtered = [
+                item
+                for item in filtered
+                if any(normalized in str(item.get(field) or "").lower() for field in searchable_fields)
+            ]
+    return filtered
+
+
 def _get_accessible_registration(
     *,
     registration_id: str,
@@ -222,6 +246,9 @@ def list_registrations(
     actor_roles: list[str] | None = None,
     page: int = 1,
     page_size: int = 20,
+    registration_status: str | None = None,
+    register_type: str | None = None,
+    keyword: str | None = None,
 ) -> dict[str, object]:
     if not _actor_has_any_role(actor_roles, _BACKOFFICE_VIEW_ROLES):
         return error_response(
@@ -241,6 +268,12 @@ def list_registrations(
         actor_id=actor_id,
         actor_roles=actor_roles,
     )
+    filtered_items = _filter_registration_items(
+        all_items,
+        registration_status=registration_status,
+        register_type=register_type,
+        keyword=keyword,
+    )
     start = max(page - 1, 0) * page_size
     end = start + page_size
     return success_response(
@@ -248,8 +281,8 @@ def list_registrations(
         data={
             "page": page,
             "pageSize": page_size,
-            "total": len(all_items),
-            "items": all_items[start:end],
+            "total": len(filtered_items),
+            "items": filtered_items[start:end],
         },
     )
 
