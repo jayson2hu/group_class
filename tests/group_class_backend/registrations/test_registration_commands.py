@@ -198,6 +198,8 @@ def test_submit_waitlist_registration_creates_record_and_updates_waitlist_count(
     assert response["code"] == ErrorCode.OK
     assert response["data"]["registerType"] == "WAITLIST"
     assert response["data"]["registrationStatus"] == "WAITLISTED"
+    assert response["data"]["waitlistCount"] == 1
+    assert response["data"]["waitlistPosition"] == 1
     assert persisted_registration.accept_similar_recommendation is True
     assert persisted_class is not None
     assert persisted_class.current_students == 0

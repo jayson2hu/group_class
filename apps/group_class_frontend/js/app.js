@@ -564,6 +564,9 @@ async function renderEnrollmentSuccess(result, classId) {
   const waitlistNotice = registerType === "WAITLIST" || ["FULL", "WAITLIST_OPEN"].includes(result.classStatus)
     ? '<p class="muted">您已加入候补，如有空位将尽快通知。</p>'
     : "";
+  const waitlistQueueHtml = registerType === "WAITLIST" && (result.waitlistPosition || result.waitlistCount)
+    ? `<p><strong>候补位置：</strong>${result.waitlistPosition || "-"}${result.waitlistCount ? ` / 当前候补 ${result.waitlistCount} 人` : ""}</p>`
+    : "";
   setHtml(`
     <section class="panel success-hero">
       <div class="success-icon" aria-hidden="true"></div>
@@ -571,7 +574,7 @@ async function renderEnrollmentSuccess(result, classId) {
       <p class="muted">报名编号：${result.registrationId || "-"}</p>
     </section>
     <section class="success-grid">
-      <article class="panel success-card"><h3>报名信息</h3><p><strong>报名类型：</strong>${registrationTypeLabel(registerType)}</p><p><strong>报名状态：</strong>${result.registrationStatus || "-"}</p><p><strong>课程状态：</strong>${classStatusLabel(result.classStatus)}</p></article>
+      <article class="panel success-card"><h3>报名信息</h3><p><strong>报名类型：</strong>${registrationTypeLabel(registerType)}</p><p><strong>报名状态：</strong>${result.registrationStatus || "-"}</p><p><strong>课程状态：</strong>${classStatusLabel(result.classStatus)}</p>${waitlistQueueHtml}</article>
       <article class="panel success-card"><h3>后续说明</h3><p>${successContent.intro}</p><p class="muted">${result.nextStepText || "提交成功，老师/运营将尽快联系确认。"}</p><p class="muted">${progressText}</p>${waitlistNotice}</article>
     </section>
     <section class="panel success-process">

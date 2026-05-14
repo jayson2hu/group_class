@@ -282,9 +282,10 @@ export class ApiClient {
       return {
         registrationId: id,
         registerType: payload.registerType,
-        registrationStatus: "SUBMITTED",
+        registrationStatus: payload.registerType === "WAITLIST" ? "WAITLISTED" : "SUBMITTED",
         classStatus: "OPEN_FOR_ENROLLMENT",
         nextStepText: "提交成功，老师/运营将尽快联系确认",
+        ...(payload.registerType === "WAITLIST" ? { waitlistCount: 4, waitlistPosition: 4 } : {}),
       };
     }
     const result = await requestJson(

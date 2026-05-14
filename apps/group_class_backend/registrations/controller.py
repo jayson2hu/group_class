@@ -74,20 +74,24 @@ def _validate_class_status(group_class_status: ClassStatus, registration_type: R
         )
 
 
-def _serialize_result(registration: Registration, class_status: ClassStatus) -> dict[str, object]:
+def _serialize_result(registration: Registration, class_status: ClassStatus, waitlist_count: int | None = None) -> dict[str, object]:
     if registration.registration_type == RegistrationType.ENROLLMENT:
         next_step_text = "提交成功，老师/运营将尽快联系确认"
     elif registration.registration_type == RegistrationType.WAITLIST:
         next_step_text = "已加入候补，如有空位将尽快通知你"
     else:
         next_step_text = "试听申请已提交，老师/运营将尽快联系确认"
-    return {
+    result: dict[str, object] = {
         "registrationId": registration.registration_id,
         "registerType": registration.registration_type.value,
         "registrationStatus": registration.status.value,
         "classStatus": class_status.value,
         "nextStepText": next_step_text,
     }
+    if registration.registration_type == RegistrationType.WAITLIST and waitlist_count is not None:
+        result["waitlistCount"] = waitlist_count
+        result["waitlistPosition"] = waitlist_count
+    return result
 
 
 def _status_after_enrollment(group_class: GroupClass, next_current_students: int) -> ClassStatus:
@@ -580,4 +584,5 @@ def submit_registration(
             },
         )
     )
-    return success_response(request_id=request_id, data=_serialize_result(registration, updated_class.status))
+    waitlist_count = updated_class.waitlist_count if registration_type == RegistrationType.WAITLIST else None
+    return success_response(request_id=request_id, data=_serialize_result(registration, updated_class.status, waitlist_count))

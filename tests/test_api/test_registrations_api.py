@@ -84,7 +84,10 @@ def test_waitlist_registration_success(client, public_headers):
     )
 
     assert response.status_code == 200
-    assert response.json()["data"]["registrationStatus"] == "WAITLISTED"
+    data = response.json()["data"]
+    assert data["registrationStatus"] == "WAITLISTED"
+    assert data["waitlistCount"] >= 1
+    assert data["waitlistPosition"] == data["waitlistCount"]
 
 
 def test_waitlist_increments_waitlist_count(client, public_headers):

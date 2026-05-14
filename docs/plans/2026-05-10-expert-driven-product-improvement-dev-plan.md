@@ -489,7 +489,7 @@ uv run pytest tests/ -q
 | X7 | 问题池合并和优先级排序 | ✅ 已完成 | 文档 review | - |
 | K1 | 前台课程卡片决策信息增强 | ✅ 已完成 | `node --check app.js`; `node --check api.js`; `uv run pytest tests/ -q` 149 passed | `feat: improve public class cards` |
 | K2 | 报名成功页后续预期增强 | ✅ 已完成 | `node --check app.js`; `node --check api.js`; `uv run pytest tests/ -q` 149 passed | `feat: clarify registration success next steps` |
-| K3 | 候补成功预期增强 | ✅ 已确认 | - | - |
+| K3 | 候补成功预期增强 | ✅ 已完成 | `pytest registrations` 37 passed; `node --check app.js/api.js`; `uv run pytest tests/ -q` 149 passed | `feat: show waitlist position after submit` |
 | K4 | 报名列表状态筛选和待跟进视图 | ✅ 已确认 | - | - |
 | K5 | 发布前课程完整性校验 | ✅ 已确认 | - | - |
 
@@ -521,6 +521,19 @@ uv run pytest tests/ -q
   - `node --check apps/group_class_frontend/js/api.js`
   - `/Users/fayun/.local/bin/uv run pytest tests/ -q`（149 passed）
 - Commit：`feat: clarify registration success next steps`
+
+### K3 完成记录（2026-05-13）
+
+- WAITLIST 提交成功响应新增 `waitlistCount` 和 `waitlistPosition`。
+- 候补位置按提交后课程 `waitlist_count` 返回，等价于本次进入后的队列位置。
+- 报名成功页在 WAITLIST 场景展示候补位置和当前候补人数。
+- mock 提交响应同步补充 WAITLIST 状态和候补队列字段，方便前端本地验证。
+- 自测：
+  - `node --check apps/group_class_frontend/js/app.js`
+  - `node --check apps/group_class_frontend/js/api.js`
+  - `/Users/fayun/.local/bin/uv run pytest tests/group_class_backend/registrations/test_registration_commands.py tests/test_api/test_registrations_api.py -q`（37 passed）
+  - `/Users/fayun/.local/bin/uv run pytest tests/ -q`（149 passed）
+- Commit：`feat: show waitlist position after submit`
 
 ## 8. 验收口径
 
