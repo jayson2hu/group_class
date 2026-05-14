@@ -120,7 +120,7 @@ async function renderMyRegistrations() {
   const summary = { ENROLLMENT: 0, WAITLIST: 0, TRIAL: 0 };
   items.forEach((item) => { if (summary[item.registerType] !== undefined) summary[item.registerType] += 1; });
   const cards = items.map((item) => `
-    <article class="panel registration-card">
+    <article class="panel registration-card" data-registration-id="${escapeHtml(item.registrationId)}">
       <div class="registration-card-head"><h3>${escapeHtml(item.className || "未命名课程")}</h3><div class="registration-card-chips">${registrationTypeChip(item.registerType)}${statusChip(item.registrationStatus, item.registrationStatus)}</div></div>
       <dl class="registration-card-info">
         <div><dt>学员</dt><dd>${escapeHtml(item.studentName || "-")}</dd></div>
@@ -128,6 +128,10 @@ async function renderMyRegistrations() {
         <div><dt>家长</dt><dd>${escapeHtml(item.parentName || "-")}</dd></div>
         <div><dt>提交时间</dt><dd>${escapeHtml(item.submittedAt || "-")}</dd></div>
       </dl>
+      <div class="actions">
+        <button type="button" class="btn" data-action="edit-registration" data-registration-id="${escapeHtml(item.registrationId)}">修改资料</button>
+        <button type="button" class="btn" data-action="cancel-registration" data-registration-id="${escapeHtml(item.registrationId)}" ${item.registrationStatus === "CANCELLED" ? "disabled" : ""}>取消报名</button>
+      </div>
     </article>
   `).join("");
   setHtml(`
@@ -142,6 +146,48 @@ async function renderMyRegistrations() {
     </section>
     <section class="grid registration-card-grid">${cards}</section>
   `);
+  bindMyRegistrationActions(items);
+}
+
+function bindMyRegistrationActions(items) {
+  const byId = new Map(items.map((item) => [item.registrationId, item]));
+  document.querySelectorAll("[data-action='cancel-registration']").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const registrationId = button.getAttribute("data-registration-id");
+      if (!registrationId || !window.confirm("确认取消这条报名记录？")) return;
+      const restore = setButtonLoading(button, "取消中...");
+      try {
+        await api.cancelMyRegistration(registrationId);
+        showToast("报名已取消", "success");
+        await renderMyRegistrations();
+      } catch (error) {
+        showToast(error.message || "取消失败", "error");
+        restore();
+      }
+    });
+  });
+  document.querySelectorAll("[data-action='edit-registration']").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const registrationId = button.getAttribute("data-registration-id");
+      const current = registrationId ? byId.get(registrationId) : null;
+      if (!registrationId || !current) return;
+      const parentName = window.prompt("家长姓名", current.parentName || "");
+      if (parentName === null) return;
+      const studentName = window.prompt("学员姓名", current.studentName || "");
+      if (studentName === null) return;
+      const studentGrade = window.prompt("学员年级", current.studentGrade || "");
+      if (studentGrade === null) return;
+      const restore = setButtonLoading(button, "保存中...");
+      try {
+        await api.updateMyRegistration(registrationId, { parentName, studentName, studentGrade });
+        showToast("报名资料已更新", "success");
+        await renderMyRegistrations();
+      } catch (error) {
+        showToast(error.message || "保存失败", "error");
+        restore();
+      }
+    });
+  });
 }
 
 function navigateTo(hash) {

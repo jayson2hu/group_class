@@ -266,6 +266,24 @@ export class ApiClient {
     return result.data || result;
   }
 
+  async updateMyRegistration(registrationId, payload) {
+    const result = await requestJson(`${this.baseUrl}/api/v1/account/registrations/${registrationId}/update`, {
+      method: "POST",
+      headers: this.buildHeaders({ "Content-Type": "application/json" }, true),
+      body: JSON.stringify(payload),
+    });
+    return result.data || result;
+  }
+
+  async cancelMyRegistration(registrationId) {
+    const result = await requestJson(`${this.baseUrl}/api/v1/account/registrations/${registrationId}/cancel`, {
+      method: "POST",
+      headers: this.buildHeaders({ "Content-Type": "application/json" }, true),
+      body: JSON.stringify({}),
+    });
+    return result.data || result;
+  }
+
   async getAdminClasses() {
     if (this.useMockData) {
       return mockClasses.map((item) => ({

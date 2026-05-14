@@ -32,9 +32,11 @@ from apps.group_class_backend.models.group_class import GroupClass
 from apps.group_class_backend.persistence.schema import apply_schema
 from apps.group_class_backend.registrations.controller import (
     get_registration_detail,
+    cancel_my_registration,
     list_registrations,
     list_my_registrations,
     submit_registration,
+    update_my_registration,
     update_registration_notes,
     update_registration_status,
 )
@@ -480,6 +482,42 @@ class GroupClassRequestHandler(BaseHTTPRequestHandler):
                         "data": {"valid": is_valid},
                     },
                 )
+                return
+
+            if path.startswith("/api/v1/account/registrations/") and path.endswith("/update"):
+                session = self._require_admin_auth(request_id)
+                if session is None:
+                    return
+                body = self._read_json_body()
+                registration_id = path.removeprefix("/api/v1/account/registrations/").removesuffix("/update").strip("/")
+                result = update_my_registration(
+                    registration_id=registration_id,
+                    payload=body,
+                    class_repository=self.state.class_repository,
+                    registration_repository=self.state.registration_repository,
+                    request_id=request_id,
+                    actor_id=str(session.get("actorId") or ""),
+                    now=datetime.now(timezone.utc),
+                )
+                status = self._http_status_for_result(result)
+                self._write_json(status, result)
+                return
+
+            if path.startswith("/api/v1/account/registrations/") and path.endswith("/cancel"):
+                session = self._require_admin_auth(request_id)
+                if session is None:
+                    return
+                registration_id = path.removeprefix("/api/v1/account/registrations/").removesuffix("/cancel").strip("/")
+                result = cancel_my_registration(
+                    registration_id=registration_id,
+                    class_repository=self.state.class_repository,
+                    registration_repository=self.state.registration_repository,
+                    request_id=request_id,
+                    actor_id=str(session.get("actorId") or ""),
+                    now=datetime.now(timezone.utc),
+                )
+                status = self._http_status_for_result(result)
+                self._write_json(status, result)
                 return
 
             if path.startswith("/api/v1/admin/"):

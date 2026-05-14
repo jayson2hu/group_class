@@ -176,6 +176,80 @@ def _serialize_registration_detail(registration: Registration, group_class: Grou
     }
 
 
+def update_my_registration(
+    *,
+    registration_id: str,
+    payload: dict[str, object],
+    class_repository: InMemoryClassRepository | SQLiteClassRepository,
+    registration_repository: InMemoryRegistrationRepository | SQLiteRegistrationRepository,
+    request_id: str,
+    actor_id: str,
+    now,
+) -> dict[str, object]:
+    registration = registration_repository.get(registration_id)
+    if registration is None or registration.user_id != actor_id:
+        return error_response(
+            request_id=request_id,
+            code=ErrorCode.CLASS_NOT_FOUND,
+            details=[{"field": "registrationId", "message": "registration not found"}],
+        )
+    if registration.status == RegistrationStatus.CANCELLED:
+        return error_response(
+            request_id=request_id,
+            code=ErrorCode.VALIDATION_INVALID_ARGUMENT,
+            details=[{"field": "registrationStatus", "message": "cancelled registration cannot be edited"}],
+        )
+    group_class = class_repository.get(registration.class_id)
+    if group_class is None:
+        return error_response(
+            request_id=request_id,
+            code=ErrorCode.CLASS_NOT_FOUND,
+            details=[{"field": "classId", "message": "class not found"}],
+        )
+    updated = registration_repository.update(
+        replace(
+            registration,
+            parent_name=payload.get("parentName", registration.parent_name),
+            contact_info=payload.get("contactInfo", registration.contact_info),
+            student_name=payload.get("studentName", registration.student_name),
+            student_grade=payload.get("studentGrade", registration.student_grade),
+            english_level=payload.get("englishLevel", registration.english_level),
+            remark=payload.get("remark", registration.remark),
+            updated_at=now,
+        )
+    )
+    return success_response(request_id=request_id, data=_serialize_registration_detail(updated, group_class))
+
+
+def cancel_my_registration(
+    *,
+    registration_id: str,
+    class_repository: InMemoryClassRepository | SQLiteClassRepository,
+    registration_repository: InMemoryRegistrationRepository | SQLiteRegistrationRepository,
+    request_id: str,
+    actor_id: str,
+    now,
+) -> dict[str, object]:
+    registration = registration_repository.get(registration_id)
+    if registration is None or registration.user_id != actor_id:
+        return error_response(
+            request_id=request_id,
+            code=ErrorCode.CLASS_NOT_FOUND,
+            details=[{"field": "registrationId", "message": "registration not found"}],
+        )
+    group_class = class_repository.get(registration.class_id)
+    if group_class is None:
+        return error_response(
+            request_id=request_id,
+            code=ErrorCode.CLASS_NOT_FOUND,
+            details=[{"field": "classId", "message": "class not found"}],
+        )
+    updated = registration_repository.update(
+        replace(registration, status=RegistrationStatus.CANCELLED, updated_at=now)
+    )
+    return success_response(request_id=request_id, data=_serialize_registration_detail(updated, group_class))
+
+
 def list_registrations(
     *,
     class_repository: InMemoryClassRepository | SQLiteClassRepository,
