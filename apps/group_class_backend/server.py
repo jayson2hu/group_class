@@ -14,6 +14,7 @@ from uuid import uuid4
 from apps.group_class_backend.audit.interface import NullAuditWriter
 from apps.group_class_backend.auth.configuration import AuthConfiguration, InMemoryAuthConfigurationRepository
 from apps.group_class_backend.auth.email_codes import InMemoryEmailVerificationCodeRepository
+from apps.group_class_backend.auth.users import AuthUser, InMemoryAuthUserRepository
 from apps.group_class_backend.classes.controller import (
     approve_class_review,
     create_class_draft,
@@ -42,26 +43,11 @@ from apps.group_class_backend.registrations.repository import (
 )
 
 
-_DEMO_USERS: dict[str, dict[str, Any]] = {
-    "admin": {
-        "password": "123456",
-        "actorId": "u_admin",
-        "actorRoles": ["CLASS_ADMIN"],
-        "displayName": "Admin",
-    },
-    "operator": {
-        "password": "123456",
-        "actorId": "u_operator",
-        "actorRoles": ["OPERATOR"],
-        "displayName": "Operator",
-    },
-    "teacher": {
-        "password": "123456",
-        "actorId": "u_teacher",
-        "actorRoles": ["TEACHER"],
-        "displayName": "Teacher",
-    },
-}
+_DEMO_USERS: list[AuthUser] = [
+    AuthUser(username="admin", password="123456", actor_id="u_admin", actor_roles=["CLASS_ADMIN"], display_name="Admin"),
+    AuthUser(username="operator", password="123456", actor_id="u_operator", actor_roles=["OPERATOR"], display_name="Operator"),
+    AuthUser(username="teacher", password="123456", actor_id="u_teacher", actor_roles=["TEACHER"], display_name="Teacher"),
+]
 
 
 def _seed_classes(class_repository: InMemoryClassRepository | SQLiteClassRepository) -> None:
@@ -150,6 +136,7 @@ class AppState:
         self.active_tokens: dict[str, dict[str, Any]] = {}
         self.auth_configuration_repository = InMemoryAuthConfigurationRepository()
         self.email_code_repository = InMemoryEmailVerificationCodeRepository()
+        self.auth_user_repository = InMemoryAuthUserRepository(_DEMO_USERS)
         self.sqlite_connection: sqlite3.Connection | None = None
 
         if self.storage == "sqlite":
@@ -366,8 +353,8 @@ class GroupClassRequestHandler(BaseHTTPRequestHandler):
                 body = self._read_json_body()
                 username = str(body.get("username") or "").strip()
                 password = str(body.get("password") or "")
-                profile = _DEMO_USERS.get(username)
-                if profile is None or profile["password"] != password:
+                profile = self.state.auth_user_repository.get(username)
+                if profile is None or profile.password != password:
                     self._write_json(
                         401,
                         error_response(
@@ -379,14 +366,70 @@ class GroupClassRequestHandler(BaseHTTPRequestHandler):
                     return
 
                 token = f"tk-{uuid4().hex}"
-                session = {
-                    "token": token,
-                    "actorId": profile["actorId"],
-                    "actorRoles": profile["actorRoles"],
-                    "displayName": profile["displayName"],
-                }
+                session = profile.to_session(token)
                 self.state.active_tokens[token] = session
                 self._write_json(200, {"requestId": request_id, "code": ErrorCode.OK.value, "data": session})
+                return
+
+            if path == "/api/v1/auth/register/email":
+                body = self._read_json_body()
+                email = str(body.get("email") or "").strip()
+                code = str(body.get("code") or "").strip()
+                username = str(body.get("username") or "").strip()
+                password = str(body.get("password") or "")
+                display_name = str(body.get("displayName") or username or email).strip()
+                if not username or not password:
+                    self._write_json(
+                        400,
+                        error_response(
+                            request_id=request_id,
+                            code=ErrorCode.VALIDATION_REQUIRED_FIELD_MISSING,
+                            details=[{"field": "username", "message": "username and password are required"}],
+                        ),
+                    )
+                    return
+                if self.state.auth_user_repository.get(username) is not None:
+                    self._write_json(
+                        400,
+                        error_response(
+                            request_id=request_id,
+                            code=ErrorCode.VALIDATION_INVALID_ARGUMENT,
+                            details=[{"field": "username", "message": "username already exists"}],
+                        ),
+                    )
+                    return
+                if not self.state.email_code_repository.verify(email, code):
+                    self._write_json(
+                        400,
+                        error_response(
+                            request_id=request_id,
+                            code=ErrorCode.VALIDATION_INVALID_ARGUMENT,
+                            details=[{"field": "code", "message": "invalid or expired email code"}],
+                        ),
+                    )
+                    return
+                user = AuthUser(
+                    username=username,
+                    password=password,
+                    actor_id=f"u_{uuid4().hex}",
+                    actor_roles=["USER"],
+                    display_name=display_name,
+                    email=email.lower(),
+                )
+                saved = self.state.auth_user_repository.save(user)
+                self._write_json(
+                    200,
+                    {
+                        "requestId": request_id,
+                        "code": ErrorCode.OK.value,
+                        "data": {
+                            "username": saved.username,
+                            "actorId": saved.actor_id,
+                            "actorRoles": saved.actor_roles,
+                            "displayName": saved.display_name,
+                        },
+                    },
+                )
                 return
 
             if path == "/api/v1/auth/email-code/request":
