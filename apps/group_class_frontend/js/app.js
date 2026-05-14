@@ -84,16 +84,10 @@ function getActorContext() {
 }
 
 function syncAdminNav() {
-  const adminNav = document.getElementById("admin-nav");
-  const adminEntry = document.getElementById("admin-entry");
   const loginEntry = document.getElementById("login-entry");
-  const logoutBtn = document.getElementById("logout-btn");
   const inLoginPage = (window.location.hash || "").startsWith("#/login");
   const loggedIn = isLoggedIn();
-  if (adminNav) adminNav.style.display = loggedIn && !inLoginPage ? "" : "none";
-  if (adminEntry) adminEntry.style.display = loggedIn ? "none" : "";
   if (loginEntry) loginEntry.style.display = loggedIn ? "none" : "";
-  if (logoutBtn) logoutBtn.style.display = loggedIn && !inLoginPage ? "" : "none";
 }
 
 function syncNavState() {
@@ -842,9 +836,9 @@ async function renderAdminRegistrationDetail(registrationId) {
 function loginPageHtml() {
   return `
     <section class="panel login-panel">
-      <p class="section-kicker">Admin Login</p>
-      <h2>登录管理后台</h2>
-      <p class="muted">演示账号：admin / operator / teacher，密码均为 123456。</p>
+      <p class="section-kicker">Account Login</p>
+      <h2>登录报名账号</h2>
+      <p class="muted">登录后可查看自己的历史拼课、待拼课和待开课记录。</p>
       <form id="login-form" class="login-form">
         <div class="row"><label>用户名</label><input name="username" required placeholder="admin" /></div>
         <div class="row"><label>密码</label><input name="password" type="password" required placeholder="123456" /></div>
@@ -868,7 +862,7 @@ function bindLoginPage(queryParams) {
       const session = await api.login(username, password);
       persistActorContext(session.actorId, session.actorRoles);
       showToast("登录成功", "success");
-      const next = queryParams.get("next") || "#/admin/classes";
+      const next = queryParams.get("next") || "#/public/classes";
       window.location.hash = next;
     } catch (error) {
       showToast(error.message || "登录失败", "error");
@@ -880,7 +874,7 @@ function bindLoginPage(queryParams) {
 function logoutAndBackToLogin() {
   api.logout();
   showToast("已退出登录", "info");
-  const next = encodeURIComponent(window.location.hash || "#/admin/classes");
+  const next = encodeURIComponent(window.location.hash || "#/public/classes");
   navigateTo(`#/login?next=${next}`);
 }
 
@@ -890,8 +884,8 @@ async function renderRoute() {
   setHtml(loadingHtml());
 
   const hash = window.location.hash || "#/public/classes";
-  if (!isLoggedIn() && hash.startsWith("#/admin")) {
-    navigateTo(`#/login?next=${encodeURIComponent(hash)}`);
+  if (hash.startsWith("#/admin")) {
+    setHtml(errorStateHtml("管理后台已从课程前台拆分，请使用独立后台入口访问。", "#/public/classes"));
     return;
   }
 
@@ -926,7 +920,6 @@ window.addEventListener("hashchange", () => {
   renderRoute();
 });
 
-document.getElementById("logout-btn")?.addEventListener("click", () => logoutAndBackToLogin());
 document.addEventListener("click", (event) => {
   const link = event.target.closest("a[href^='#/']");
   if (!link) return;
