@@ -126,6 +126,7 @@ async function renderMyRegistrations() {
         <div><dt>学员</dt><dd>${escapeHtml(item.studentName || "-")}</dd></div>
         <div><dt>年级</dt><dd>${escapeHtml(item.studentGrade || "-")}</dd></div>
         <div><dt>家长</dt><dd>${escapeHtml(item.parentName || "-")}</dd></div>
+        <div><dt>缴费状态</dt><dd>${escapeHtml(paymentStatusLabel(item.paymentStatus))}</dd></div>
         <div><dt>提交时间</dt><dd>${escapeHtml(item.submittedAt || "-")}</dd></div>
       </dl>
       <div class="actions">
@@ -232,6 +233,11 @@ function registrationTypeLabel(type) {
 
 function registrationTypeChip(type) {
   return `<span class="chip ${escapeHtml(type)}">${escapeHtml(registrationTypeLabel(type))}</span>`;
+}
+
+function paymentStatusLabel(status) {
+  const mapping = { UNPAID: "未缴费", PAID: "已缴费", PENDING_CONFIRMATION: "待确认", REFUNDED: "已退款" };
+  return mapping[status] || status || "-";
 }
 
 function formatDateRange(startDate, endDate) {
@@ -838,6 +844,7 @@ async function renderAdminRegistrations() {
 function bindRegistrationDetail(registrationId) {
   const noteForm = document.getElementById("registration-note-form");
   const statusForm = document.getElementById("registration-status-form");
+  const paymentForm = document.getElementById("registration-payment-form");
   const { actorId, actorRoles } = getActorContext();
   if (noteForm) noteForm.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -867,6 +874,20 @@ function bindRegistrationDetail(registrationId) {
       restore();
     }
   });
+  if (paymentForm) paymentForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const button = paymentForm.querySelector("button[type='submit']");
+    const restore = setButtonLoading(button, "更新中...");
+    try {
+      const fd = new FormData(paymentForm);
+      await api.updateRegistrationPaymentStatus(registrationId, { paymentStatus: String(fd.get("paymentStatus") || ""), actorId, actorRoles });
+      showToast("缴费状态已更新", "success");
+      await renderAdminRegistrationDetail(registrationId);
+    } catch (error) {
+      showToast(error.message || "缴费状态更新失败", "error");
+      restore();
+    }
+  });
 }
 
 async function renderAdminRegistrationDetail(registrationId) {
@@ -893,6 +914,7 @@ async function renderAdminRegistrationDetail(registrationId) {
           <div><dt>英语基础</dt><dd>${escapeHtml(detail.englishLevel || "-")}</dd></div>
           <div><dt>提交时间</dt><dd>${escapeHtml(detail.submittedAt || "-")}</dd></div>
           <div><dt>更新时间</dt><dd>${escapeHtml(detail.updatedAt || "-")}</dd></div>
+          <div><dt>缴费状态</dt><dd>${escapeHtml(paymentStatusLabel(detail.paymentStatus))}</dd></div>
           <div class="full-span"><dt>备注</dt><dd>${escapeHtml(detail.remark || "-")}</dd></div>
         </dl>
       </article>
@@ -911,6 +933,10 @@ async function renderAdminRegistrationDetail(registrationId) {
           <form id="registration-status-form">
             <div class="row"><label>报名状态</label><select name="registrationStatus"><option value="VALID" ${detail.registrationStatus === "VALID" ? "selected" : ""}>有效</option><option value="INVALID" ${detail.registrationStatus === "INVALID" ? "selected" : ""}>无效</option><option value="CANCELLED" ${detail.registrationStatus === "CANCELLED" ? "selected" : ""}>已取消</option></select></div>
             <button type="submit" class="primary">更新状态</button>
+          </form>
+          <form id="registration-payment-form">
+            <div class="row"><label>缴费状态</label><select name="paymentStatus"><option value="UNPAID" ${detail.paymentStatus === "UNPAID" ? "selected" : ""}>未缴费</option><option value="PENDING_CONFIRMATION" ${detail.paymentStatus === "PENDING_CONFIRMATION" ? "selected" : ""}>待确认</option><option value="PAID" ${detail.paymentStatus === "PAID" ? "selected" : ""}>已缴费</option><option value="REFUNDED" ${detail.paymentStatus === "REFUNDED" ? "selected" : ""}>已退款</option></select></div>
+            <button type="submit" class="primary">更新缴费状态</button>
           </form>
           <div class="actions admin-detail-actions"><a class="btn" href="#/admin/registrations">返回报名列表</a></div>
         </section>

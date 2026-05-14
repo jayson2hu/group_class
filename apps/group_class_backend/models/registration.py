@@ -20,6 +20,13 @@ class RegistrationStatus(StrEnum):
     CANCELLED = "CANCELLED"
 
 
+class PaymentStatus(StrEnum):
+    UNPAID = "UNPAID"
+    PAID = "PAID"
+    PENDING_CONFIRMATION = "PENDING_CONFIRMATION"
+    REFUNDED = "REFUNDED"
+
+
 @dataclass(slots=True)
 class Registration:
     registration_id: str
@@ -40,6 +47,7 @@ class Registration:
     remark: str | None = None
     follow_up_note: str | None = None
     notes: str | None = None
+    payment_status: PaymentStatus = PaymentStatus.UNPAID
     created_at: datetime | None = None
     updated_at: datetime | None = None
 
@@ -100,6 +108,7 @@ class Registration:
             remark=remark,
             follow_up_note=follow_up_note,
             notes=notes,
+            payment_status=PaymentStatus.UNPAID,
             created_at=submitted_at,
             updated_at=submitted_at,
         )

@@ -9,7 +9,7 @@ from apps.group_class_backend.common.enums import ClassStatus
 from apps.group_class_backend.common.error_codes import ErrorCode
 from apps.group_class_backend.common.responses import error_response, success_response
 from apps.group_class_backend.models.group_class import GroupClass
-from apps.group_class_backend.models.registration import Registration, RegistrationStatus, RegistrationType
+from apps.group_class_backend.models.registration import PaymentStatus, Registration, RegistrationStatus, RegistrationType
 from apps.group_class_backend.registrations.repository import InMemoryRegistrationRepository, SQLiteRegistrationRepository
 
 
@@ -112,6 +112,7 @@ def _serialize_registration_list_item(registration: Registration, group_class: G
         "studentGrade": registration.student_grade,
         "contactInfo": registration.contact_info,
         "submittedAt": registration.submitted_at.isoformat(),
+        "paymentStatus": registration.payment_status.value,
         "followUpNote": registration.follow_up_note,
         "notes": registration.notes,
     }
@@ -173,6 +174,7 @@ def _serialize_registration_detail(registration: Registration, group_class: Grou
         "notes": registration.notes,
         "submittedAt": registration.submitted_at.isoformat(),
         "updatedAt": registration.updated_at.isoformat() if registration.updated_at else None,
+        "paymentStatus": registration.payment_status.value,
     }
 
 
@@ -428,6 +430,47 @@ def update_registration_status(
         )
     )
     return success_response(request_id=request_id, data=_serialize_registration_detail(updated_registration, group_class))
+
+
+def update_registration_payment_status(
+    *,
+    registration_id: str,
+    payload: dict[str, object],
+    class_repository: InMemoryClassRepository | SQLiteClassRepository,
+    registration_repository: InMemoryRegistrationRepository | SQLiteRegistrationRepository,
+    request_id: str,
+    actor_id: str,
+    actor_roles: list[str] | None = None,
+    now,
+) -> dict[str, object]:
+    registration, group_class, error = _get_accessible_registration(
+        registration_id=registration_id,
+        class_repository=class_repository,
+        registration_repository=registration_repository,
+        request_id=request_id,
+        actor_id=actor_id,
+        actor_roles=actor_roles,
+    )
+    if error is not None:
+        return error
+    if not _actor_has_any_role(actor_roles, _ALLOWED_STATUS_UPDATE_ROLES):
+        return error_response(
+            request_id=request_id,
+            code=ErrorCode.PERMISSION_DENIED,
+            details=[{"field": "actorRoles", "message": "only backoffice roles can update payment status"}],
+        )
+    try:
+        payment_status = PaymentStatus(str(payload.get("paymentStatus") or ""))
+    except ValueError:
+        return error_response(
+            request_id=request_id,
+            code=ErrorCode.VALIDATION_INVALID_ARGUMENT,
+            details=[{"field": "paymentStatus", "message": "paymentStatus is invalid"}],
+        )
+    updated = registration_repository.update(
+        replace(registration, payment_status=payment_status, updated_at=now)
+    )
+    return success_response(request_id=request_id, data=_serialize_registration_detail(updated, group_class))
 
 
 def submit_registration(

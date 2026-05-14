@@ -445,6 +445,15 @@ export class ApiClient {
     return result.data || result;
   }
 
+  async updateRegistrationPaymentStatus(registrationId, payload) {
+    const result = await requestJson(`${this.baseUrl}/api/v1/admin/registrations/${registrationId}/payment-status`, {
+      method: "POST",
+      headers: this.buildHeaders({ "Content-Type": "application/json" }, true),
+      body: JSON.stringify(payload),
+    });
+    return result.data || result;
+  }
+
   mockReviewStatus(classId, version, status) {
     const index = mockClasses.findIndex((entry) => entry.classId === classId);
     if (index === -1) throw new Error("class not found");

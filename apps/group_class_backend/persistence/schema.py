@@ -66,6 +66,7 @@ CREATE TABLE registrations (
     remark TEXT,
     follow_up_note TEXT,
     notes TEXT,
+    payment_status TEXT NOT NULL DEFAULT 'UNPAID',
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
     FOREIGN KEY (class_id) REFERENCES classes(class_id)

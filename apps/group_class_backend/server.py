@@ -38,6 +38,7 @@ from apps.group_class_backend.registrations.controller import (
     submit_registration,
     update_my_registration,
     update_registration_notes,
+    update_registration_payment_status,
     update_registration_status,
 )
 from apps.group_class_backend.registrations.repository import (
@@ -664,6 +665,23 @@ class GroupClassRequestHandler(BaseHTTPRequestHandler):
                     class_repository=self.state.class_repository,
                     registration_repository=self.state.registration_repository,
                     audit_writer=self.state.audit_writer,
+                    request_id=request_id,
+                    actor_id=str(body.get("actorId") or "u_admin"),
+                    actor_roles=body.get("actorRoles"),
+                    now=datetime.now(timezone.utc),
+                )
+                status = self._http_status_for_result(result)
+                self._write_json(status, result)
+                return
+
+            if path.startswith("/api/v1/admin/registrations/") and path.endswith("/payment-status"):
+                body = self._read_json_body()
+                registration_id = path.removeprefix("/api/v1/admin/registrations/").removesuffix("/payment-status")
+                result = update_registration_payment_status(
+                    registration_id=registration_id.strip("/"),
+                    payload=body,
+                    class_repository=self.state.class_repository,
+                    registration_repository=self.state.registration_repository,
                     request_id=request_id,
                     actor_id=str(body.get("actorId") or "u_admin"),
                     actor_roles=body.get("actorRoles"),

@@ -13,6 +13,7 @@ from apps.group_class_backend.registrations.controller import (
     list_registrations,
     submit_registration,
     update_registration_notes,
+    update_registration_payment_status,
     update_registration_status,
 )
 
@@ -400,8 +401,9 @@ def test_list_registrations_returns_only_owned_class_records_for_initiator() -> 
                     "studentName": "张三",
                     "studentGrade": "三年级",
                     "contactInfo": "13800000000",
-                    "submittedAt": "2026-04-12T15:00:00+00:00",
-                    "followUpNote": None,
+                        "submittedAt": "2026-04-12T15:00:00+00:00",
+                        "paymentStatus": "UNPAID",
+                        "followUpNote": None,
                     "notes": None,
                 }
             ]
@@ -563,6 +565,7 @@ def test_get_registration_detail_and_update_notes_for_owned_class_initiator() ->
             "notes": "家长偏好周末上午",
             "submittedAt": "2026-04-12T15:00:00+00:00",
             "updatedAt": "2026-04-12T16:00:00+00:00",
+            "paymentStatus": "UNPAID",
         },
     }
 
@@ -656,6 +659,44 @@ def test_update_registration_status_marks_owned_class_registration_valid_and_pre
     assert persisted_class is not None
     assert persisted_class.current_students == 1
     assert persisted_class.waitlist_count == 0
+
+
+def test_update_registration_payment_status_marks_registration_paid() -> None:
+    class_repository = InMemoryClassRepository()
+    registration_repository = InMemoryRegistrationRepository()
+    class_id = _seed_open_class(class_repository)
+
+    submit_registration(
+        payload={
+            "classId": class_id,
+            "registerType": "ENROLLMENT",
+            "parentName": "张女士",
+            "contactInfo": "13800000000",
+            "studentName": "张三",
+            "studentGrade": "三年级",
+        },
+        class_repository=class_repository,
+        registration_repository=registration_repository,
+        audit_writer=NullAuditWriter(),
+        request_id="req-registration-payment-seed-001",
+        actor_id="parent-001",
+        now=datetime(2026, 4, 12, 15, 0, tzinfo=timezone.utc),
+    )
+    registration_id = registration_repository.list()[0].registration_id
+
+    response = update_registration_payment_status(
+        registration_id=registration_id,
+        payload={"paymentStatus": "PAID"},
+        class_repository=class_repository,
+        registration_repository=registration_repository,
+        request_id="req-registration-payment-update-001",
+        actor_id="admin-001",
+        actor_roles=["CLASS_ADMIN"],
+        now=datetime(2026, 4, 12, 16, 0, tzinfo=timezone.utc),
+    )
+
+    assert response["code"] == ErrorCode.OK
+    assert response["data"]["paymentStatus"] == "PAID"
 
 
 def test_update_registration_status_rejects_unowned_initiator() -> None:

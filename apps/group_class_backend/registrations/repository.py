@@ -3,7 +3,7 @@ from __future__ import annotations
 import sqlite3
 from datetime import datetime, timezone
 
-from apps.group_class_backend.models.registration import Registration, RegistrationStatus, RegistrationType
+from apps.group_class_backend.models.registration import PaymentStatus, Registration, RegistrationStatus, RegistrationType
 
 
 class InMemoryRegistrationRepository:
@@ -39,8 +39,8 @@ class SQLiteRegistrationRepository:
                 registration_id, class_id, user_id, registration_type, status, submitted_at,
                 parent_name, contact_info, student_name, student_grade, english_level,
                 accept_transfer, accept_waitlist, wants_trial, accept_similar_recommendation,
-                remark, follow_up_note, notes, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                remark, follow_up_note, notes, payment_status, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             self._to_row(registration),
         )
@@ -67,7 +67,7 @@ class SQLiteRegistrationRepository:
             SET class_id = ?, user_id = ?, registration_type = ?, status = ?, submitted_at = ?,
                 parent_name = ?, contact_info = ?, student_name = ?, student_grade = ?, english_level = ?,
                 accept_transfer = ?, accept_waitlist = ?, wants_trial = ?, accept_similar_recommendation = ?,
-                remark = ?, follow_up_note = ?, notes = ?, created_at = ?, updated_at = ?
+                remark = ?, follow_up_note = ?, notes = ?, payment_status = ?, created_at = ?, updated_at = ?
             WHERE registration_id = ?
             """,
             (
@@ -88,6 +88,7 @@ class SQLiteRegistrationRepository:
                 registration.remark,
                 registration.follow_up_note,
                 registration.notes,
+                registration.payment_status.value,
                 self._serialize_datetime(registration.created_at),
                 self._serialize_datetime(registration.updated_at),
                 registration.registration_id,
@@ -116,6 +117,7 @@ class SQLiteRegistrationRepository:
             registration.remark,
             registration.follow_up_note,
             registration.notes,
+            registration.payment_status.value,
             self._serialize_datetime(registration.created_at),
             self._serialize_datetime(registration.updated_at),
         )
@@ -140,6 +142,7 @@ class SQLiteRegistrationRepository:
             remark=row["remark"],
             follow_up_note=row["follow_up_note"],
             notes=row["notes"],
+            payment_status=PaymentStatus(row["payment_status"] or PaymentStatus.UNPAID.value),
             created_at=self._parse_datetime(row["created_at"]),
             updated_at=self._parse_datetime(row["updated_at"]),
         )
