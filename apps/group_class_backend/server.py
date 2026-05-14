@@ -14,6 +14,13 @@ from uuid import uuid4
 from apps.group_class_backend.audit.interface import NullAuditWriter
 from apps.group_class_backend.auth.configuration import AuthConfiguration, InMemoryAuthConfigurationRepository
 from apps.group_class_backend.auth.email_codes import InMemoryEmailVerificationCodeRepository
+from apps.group_class_backend.auth.accounts import (
+    create_admin_account,
+    delete_admin_account,
+    disable_admin_account,
+    list_admin_accounts,
+    update_admin_account,
+)
 from apps.group_class_backend.auth.users import AuthUser, InMemoryAuthUserRepository
 from apps.group_class_backend.classes.controller import (
     approve_class_review,
@@ -48,7 +55,7 @@ from apps.group_class_backend.registrations.repository import (
 
 
 _DEMO_USERS: list[AuthUser] = [
-    AuthUser(username="admin", password="123456", actor_id="u_admin", actor_roles=["CLASS_ADMIN"], display_name="Admin"),
+    AuthUser(username="admin", password="123456", actor_id="u_admin", actor_roles=["ADMIN", "CLASS_ADMIN"], display_name="Admin"),
     AuthUser(username="operator", password="123456", actor_id="u_operator", actor_roles=["OPERATOR"], display_name="Operator"),
     AuthUser(username="teacher", password="123456", actor_id="u_teacher", actor_roles=["TEACHER"], display_name="Teacher"),
 ]
@@ -227,6 +234,11 @@ class GroupClassRequestHandler(BaseHTTPRequestHandler):
             return None
         return self.state.active_tokens[token]
 
+    def _revoke_tokens_for_actor(self, actor_id: str) -> None:
+        for token, session in list(self.state.active_tokens.items()):
+            if str(session.get("actorId") or "") == actor_id:
+                del self.state.active_tokens[token]
+
     def do_OPTIONS(self) -> None:
         self.send_response(204)
         self.send_header("Access-Control-Allow-Origin", "*")
@@ -253,6 +265,18 @@ class GroupClassRequestHandler(BaseHTTPRequestHandler):
                         "data": self.state.auth_configuration_repository.get().to_response(),
                     },
                 )
+                return
+
+            if path == "/api/v1/admin/accounts":
+                session = self._require_admin_auth(request_id)
+                if session is None:
+                    return
+                payload = list_admin_accounts(
+                    repository=self.state.auth_user_repository,
+                    request_id=request_id,
+                    actor_roles=session.get("actorRoles"),
+                )
+                self._write_json(self._http_status_for_result(payload), payload)
                 return
 
             if path == "/api/v1/public/classes":
@@ -378,6 +402,16 @@ class GroupClassRequestHandler(BaseHTTPRequestHandler):
                             request_id=request_id,
                             code=ErrorCode.UNAUTHORIZED,
                             details=[{"field": "credentials", "message": "username or password is invalid"}],
+                        ),
+                    )
+                    return
+                if not profile.is_active:
+                    self._write_json(
+                        401,
+                        error_response(
+                            request_id=request_id,
+                            code=ErrorCode.UNAUTHORIZED,
+                            details=[{"field": "credentials", "message": "account is disabled"}],
                         ),
                     )
                     return
@@ -537,6 +571,70 @@ class GroupClassRequestHandler(BaseHTTPRequestHandler):
                         "data": saved.to_response(),
                     },
                 )
+                return
+
+            if path == "/api/v1/admin/accounts":
+                session = self._require_admin_auth(request_id)
+                if session is None:
+                    return
+                body = self._read_json_body()
+                payload = create_admin_account(
+                    repository=self.state.auth_user_repository,
+                    request_id=request_id,
+                    actor_roles=session.get("actorRoles"),
+                    payload=body,
+                )
+                self._write_json(self._http_status_for_result(payload), payload)
+                return
+
+            if path.startswith("/api/v1/admin/accounts/") and path.endswith("/update"):
+                session = self._require_admin_auth(request_id)
+                if session is None:
+                    return
+                body = self._read_json_body()
+                actor_id = path.removeprefix("/api/v1/admin/accounts/").removesuffix("/update").strip("/")
+                payload = update_admin_account(
+                    repository=self.state.auth_user_repository,
+                    request_id=request_id,
+                    actor_id=actor_id,
+                    actor_roles=session.get("actorRoles"),
+                    payload=body,
+                )
+                self._write_json(self._http_status_for_result(payload), payload)
+                return
+
+            if path.startswith("/api/v1/admin/accounts/") and path.endswith("/disable"):
+                session = self._require_admin_auth(request_id)
+                if session is None:
+                    return
+                target_actor_id = path.removeprefix("/api/v1/admin/accounts/").removesuffix("/disable").strip("/")
+                payload = disable_admin_account(
+                    repository=self.state.auth_user_repository,
+                    request_id=request_id,
+                    target_actor_id=target_actor_id,
+                    actor_id=str(session.get("actorId") or ""),
+                    actor_roles=session.get("actorRoles"),
+                )
+                if payload.get("code") == ErrorCode.OK.value:
+                    self._revoke_tokens_for_actor(target_actor_id)
+                self._write_json(self._http_status_for_result(payload), payload)
+                return
+
+            if path.startswith("/api/v1/admin/accounts/") and path.endswith("/delete"):
+                session = self._require_admin_auth(request_id)
+                if session is None:
+                    return
+                target_actor_id = path.removeprefix("/api/v1/admin/accounts/").removesuffix("/delete").strip("/")
+                payload = delete_admin_account(
+                    repository=self.state.auth_user_repository,
+                    request_id=request_id,
+                    target_actor_id=target_actor_id,
+                    actor_id=str(session.get("actorId") or ""),
+                    actor_roles=session.get("actorRoles"),
+                )
+                if payload.get("code") == ErrorCode.OK.value:
+                    self._revoke_tokens_for_actor(target_actor_id)
+                self._write_json(self._http_status_for_result(payload), payload)
                 return
 
             if path == "/api/v1/public/registrations":

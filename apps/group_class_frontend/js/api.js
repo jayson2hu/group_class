@@ -202,6 +202,49 @@ export class ApiClient {
     return result.data || result;
   }
 
+  async getAdminAccounts() {
+    const result = await requestJson(`${this.baseUrl}/api/v1/admin/accounts`, {
+      headers: this.buildHeaders({}, true),
+    });
+    return result.data || result;
+  }
+
+  async createAdminAccount(payload) {
+    const result = await requestJson(`${this.baseUrl}/api/v1/admin/accounts`, {
+      method: "POST",
+      headers: this.buildHeaders({ "Content-Type": "application/json" }, true),
+      body: JSON.stringify(payload),
+    });
+    return result.data || result;
+  }
+
+  async updateAdminAccount(actorId, payload) {
+    const result = await requestJson(`${this.baseUrl}/api/v1/admin/accounts/${actorId}/update`, {
+      method: "POST",
+      headers: this.buildHeaders({ "Content-Type": "application/json" }, true),
+      body: JSON.stringify(payload),
+    });
+    return result.data || result;
+  }
+
+  async disableAdminAccount(actorId) {
+    const result = await requestJson(`${this.baseUrl}/api/v1/admin/accounts/${actorId}/disable`, {
+      method: "POST",
+      headers: this.buildHeaders({ "Content-Type": "application/json" }, true),
+      body: JSON.stringify({}),
+    });
+    return result.data || result;
+  }
+
+  async deleteAdminAccount(actorId) {
+    const result = await requestJson(`${this.baseUrl}/api/v1/admin/accounts/${actorId}/delete`, {
+      method: "POST",
+      headers: this.buildHeaders({ "Content-Type": "application/json" }, true),
+      body: JSON.stringify({}),
+    });
+    return result.data || result;
+  }
+
   logout() {
     this.clearAuthSession();
   }

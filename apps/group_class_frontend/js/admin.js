@@ -5,7 +5,8 @@ const apiBaseUrl = window.localStorage.getItem("GROUP_CLASS_API_BASE_URL") || de
 const api = new ApiClient(apiBaseUrl);
 const app = document.getElementById("admin-app");
 
-const ADMIN_ROLES = new Set(["ADMIN", "CLASS_ADMIN", "OPERATOR", "TEACHER"]);
+const ADMIN_ROLES = new Set(["ADMIN", "CLASS_ADMIN", "SUPER_ADMIN", "OPERATOR", "TEACHER"]);
+const TOP_ADMIN_ROLES = new Set(["ADMIN", "CLASS_ADMIN", "SUPER_ADMIN"]);
 
 function escapeHtml(value) {
   return String(value ?? "")
@@ -23,14 +24,49 @@ function isLoggedIn() {
   return Boolean(api.getToken());
 }
 
-function hasAdminRole() {
+function hasAnyRole(allowedRoles) {
   const roles = getAuthUser()?.actorRoles || [];
-  return roles.some((role) => ADMIN_ROLES.has(role));
+  return roles.some((role) => allowedRoles.has(role));
+}
+
+function hasAdminRole() {
+  return hasAnyRole(ADMIN_ROLES);
+}
+
+function hasTopAdminRole() {
+  return hasAnyRole(TOP_ADMIN_ROLES);
+}
+
+function hasOperatorRole() {
+  return (getAuthUser()?.actorRoles || []).includes("OPERATOR");
 }
 
 function getRoleText() {
   const roles = getAuthUser()?.actorRoles || [];
   return roles.length ? roles.join(", ") : "未登录";
+}
+
+function manageableRoleOptions() {
+  if (hasTopAdminRole()) return ["ADMIN", "OPERATOR", "TEACHER", "USER"];
+  if (hasOperatorRole()) return ["TEACHER", "USER"];
+  return [];
+}
+
+function canManageAccount(account) {
+  const role = (account.actorRoles || [])[0] || "USER";
+  return hasTopAdminRole() || (hasOperatorRole() && ["TEACHER", "USER"].includes(role));
+}
+
+function roleLabel(role) {
+  const map = {
+    ADMIN: "管理员",
+    CLASS_ADMIN: "管理员",
+    SUPER_ADMIN: "管理员",
+    OPERATOR: "运营",
+    TEACHER: "老师",
+    USER: "普通用户",
+  };
+  return map[role] || role;
 }
 
 function getHashPath() {
@@ -94,20 +130,14 @@ function loginHtml() {
 function authMethodConfigHtml(config) {
   const qrEnabled = Boolean(config?.wechatEnabled && (config.enabledLoginMethods || []).includes("wechat_qr"));
   const emailEnabled = Boolean(config?.emailEnabled && (config.enabledLoginMethods || []).includes("email"));
-  const qrMarkup = qrEnabled
-    ? `<div class="metric-tile"><span class="metric-label">扫码登录</span><strong class="metric-value">已启用</strong><p class="muted">使用单个公众号二维码登录。</p></div>`
-    : `<div class="metric-tile"><span class="metric-label">扫码登录</span><strong class="metric-value">未启用</strong><p class="muted">管理员可在认证配置中启用。</p></div>`;
-  const emailMarkup = emailEnabled
-    ? `<div class="metric-tile"><span class="metric-label">邮箱登录</span><strong class="metric-value">已启用</strong><p class="muted">验证码有效期 ${escapeHtml(config.emailCodeTtlSeconds || 300)} 秒。</p></div>`
-    : `<div class="metric-tile"><span class="metric-label">邮箱登录</span><strong class="metric-value">未启用</strong><p class="muted">管理员可在认证配置中启用。</p></div>`;
   return `
     <section class="panel">
       <p class="section-kicker">Auth Methods</p>
       <h3>登录方式配置状态</h3>
       <div class="admin-metric-grid">
         <div class="metric-tile"><span class="metric-label">用户名登录</span><strong class="metric-value">已启用</strong><p class="muted">已注册普通用户和后台用户均可使用。</p></div>
-        ${qrMarkup}
-        ${emailMarkup}
+        <div class="metric-tile"><span class="metric-label">扫码登录</span><strong class="metric-value">${qrEnabled ? "已启用" : "未启用"}</strong><p class="muted">使用单个公众号二维码登录，由后台配置决定。</p></div>
+        <div class="metric-tile"><span class="metric-label">邮箱登录</span><strong class="metric-value">${emailEnabled ? "已启用" : "未启用"}</strong><p class="muted">验证码有效期 ${escapeHtml(config?.emailCodeTtlSeconds || 300)} 秒。</p></div>
       </div>
     </section>
   `;
@@ -175,6 +205,131 @@ function placeholderHtml(title, description) {
   `;
 }
 
+function accountsHtml(accounts) {
+  const createOptions = manageableRoleOptions()
+    .map((role) => `<option value="${role}">${roleLabel(role)}</option>`)
+    .join("");
+  const cards = accounts
+    .map((account) => {
+      const role = (account.actorRoles || [])[0] || "USER";
+      const disabled = canManageAccount(account) ? "" : "disabled";
+      const roleOptions = manageableRoleOptions()
+        .map((item) => `<option value="${item}" ${item === role ? "selected" : ""}>${roleLabel(item)}</option>`)
+        .join("");
+      return `
+        <article class="panel admin-class-card admin-account-card" data-actor-id="${escapeHtml(account.actorId)}">
+          <div class="admin-class-card-head">
+            <div>
+              <h3>${escapeHtml(account.displayName || account.username)}</h3>
+              <p class="muted">${escapeHtml(account.username)} · ${escapeHtml(account.actorId)}</p>
+            </div>
+            <span class="status-chip">${account.isActive === false ? "已禁用" : "启用中"}</span>
+          </div>
+          <form class="admin-account-update-form">
+            <div class="form-grid">
+              <div class="row"><label>显示名称</label><input name="displayName" value="${escapeHtml(account.displayName || "")}" ${disabled} required /></div>
+              <div class="row"><label>邮箱</label><input name="email" type="email" value="${escapeHtml(account.email || "")}" ${disabled} /></div>
+              <div class="row"><label>角色</label><select name="role" ${disabled}>${roleOptions || `<option value="${escapeHtml(role)}">${escapeHtml(roleLabel(role))}</option>`}</select></div>
+              <div class="row"><label>新密码</label><input name="password" type="password" placeholder="留空不修改" ${disabled} /></div>
+            </div>
+            <div class="actions admin-detail-actions">
+              <button class="primary" type="submit" ${disabled}>保存</button>
+              <button class="btn account-disable-btn" type="button" ${disabled}>禁用</button>
+              <button class="btn account-delete-btn" type="button" ${disabled}>删除</button>
+            </div>
+          </form>
+        </article>
+      `;
+    })
+    .join("");
+
+  return `
+    <section class="panel admin-hero">
+      <div>
+        <p class="section-kicker">Admin Accounts</p>
+        <h2>账号管理</h2>
+        <p class="muted admin-hero-text">管理员可管理全部账号；运营仅可管理老师和普通用户。</p>
+      </div>
+      <div class="admin-summary-grid">
+        <div class="summary-pill"><span class="summary-label">可见账号</span><strong class="summary-value">${accounts.length}</strong></div>
+        <div class="summary-pill"><span class="summary-label">当前角色</span><strong class="summary-value">${escapeHtml(getRoleText())}</strong></div>
+      </div>
+    </section>
+    <form id="admin-account-create-form" class="panel admin-class-form">
+      <h3>新建账号</h3>
+      <div class="form-grid">
+        <div class="row"><label>用户名</label><input name="username" required /></div>
+        <div class="row"><label>密码</label><input name="password" type="password" required /></div>
+        <div class="row"><label>显示名称</label><input name="displayName" required /></div>
+        <div class="row"><label>邮箱</label><input name="email" type="email" /></div>
+        <div class="row"><label>角色</label><select name="role" required>${createOptions}</select></div>
+      </div>
+      <div class="form-submit-bar">
+        <div><strong>保存账号</strong><p class="muted">账号创建后可使用用户名和密码登录。</p></div>
+        <div class="actions form-submit-actions"><button type="submit" class="primary">创建账号</button></div>
+      </div>
+      <p id="admin-account-form-error" class="error" hidden></p>
+    </form>
+    <section class="grid admin-class-grid">${cards || `<article class="panel">暂无账号</article>`}</section>
+  `;
+}
+
+function bindAccounts() {
+  const createForm = document.getElementById("admin-account-create-form");
+  const errorNode = document.getElementById("admin-account-form-error");
+  createForm?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const fd = new FormData(createForm);
+    try {
+      await api.createAdminAccount({
+        username: String(fd.get("username") || "").trim(),
+        password: String(fd.get("password") || ""),
+        displayName: String(fd.get("displayName") || "").trim(),
+        email: String(fd.get("email") || "").trim(),
+        role: String(fd.get("role") || "").trim(),
+      });
+      await renderAccounts();
+    } catch (error) {
+      if (errorNode) {
+        errorNode.textContent = error.message || "创建账号失败";
+        errorNode.hidden = false;
+      }
+    }
+  });
+
+  document.querySelectorAll(".admin-account-card").forEach((card) => {
+    const actorId = card.getAttribute("data-actor-id");
+    const form = card.querySelector(".admin-account-update-form");
+    form?.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const fd = new FormData(form);
+      await api.updateAdminAccount(actorId, {
+        displayName: String(fd.get("displayName") || "").trim(),
+        email: String(fd.get("email") || "").trim(),
+        role: String(fd.get("role") || "").trim(),
+        password: String(fd.get("password") || ""),
+      });
+      await renderAccounts();
+    });
+    card.querySelector(".account-disable-btn")?.addEventListener("click", async () => {
+      if (!window.confirm("确认禁用该账号？")) return;
+      await api.disableAdminAccount(actorId);
+      await renderAccounts();
+    });
+    card.querySelector(".account-delete-btn")?.addEventListener("click", async () => {
+      if (!window.confirm("确认删除该账号？")) return;
+      await api.deleteAdminAccount(actorId);
+      await renderAccounts();
+    });
+  });
+}
+
+async function renderAccounts() {
+  const result = await api.getAdminAccounts();
+  setHtml(accountsHtml(result.items || []));
+  bindAccounts();
+}
+
 async function renderRoute() {
   syncShell();
   setHtml(loadingHtml());
@@ -207,7 +362,7 @@ async function renderRoute() {
     return;
   }
   if (path === "accounts") {
-    setHtml(placeholderHtml("账号管理", "管理员和运营账号权限将在后续小功能中实现。"));
+    await renderAccounts();
     return;
   }
   if (path === "seo") {
