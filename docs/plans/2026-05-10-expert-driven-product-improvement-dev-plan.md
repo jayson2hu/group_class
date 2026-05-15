@@ -492,6 +492,7 @@ uv run pytest tests/ -q
 | K3 | 候补成功预期增强 | ✅ 已完成 | `pytest registrations` 37 passed; `node --check app.js/api.js`; `uv run pytest tests/ -q` 149 passed | `feat: show waitlist position after submit` |
 | K4 | 报名列表状态筛选和待跟进视图 | ✅ 已完成 | `pytest test_registrations_api.py` 20 passed; `node --check app.js/api.js`; `uv run pytest tests/ -q` 152 passed | `feat: filter admin registrations` |
 | K5 | 发布前课程完整性校验 | ✅ 已完成 | `pytest classes/registrations` 92 passed; `node --check app.js/api.js`; `uv run pytest tests/ -q` 154 passed | `feat: validate class readiness before review` |
+| K6 | 报名详情操作历史 | ✅ 已完成 | `pytest registrations/common` 47 passed; `node --check app.js/api.js`; `uv run pytest tests/ -q` 155 passed | `feat: show registration operation history` |
 
 ---
 
@@ -561,6 +562,20 @@ uv run pytest tests/ -q
   - `/Users/fayun/.local/bin/uv run pytest tests/group_class_backend/classes/test_class_queries_and_update.py tests/test_api/test_classes_api.py tests/test_api/test_registrations_api.py -q`（92 passed）
   - `/Users/fayun/.local/bin/uv run pytest tests/ -q`（154 passed）
 - Commit：`feat: validate class readiness before review`
+
+### K6 完成记录（2026-05-14）
+
+- 新增内存审计日志 `InMemoryAuditLog`，应用运行时保存已有 audit 事件。
+- 报名详情新增 `operationHistory`，返回提交报名、更新备注、更新状态、候补转正等报名维度操作。
+- 更新跟进备注时补充 `registration.notes_updated` 审计事件。
+- 后台报名详情页新增“操作历史”时间线，展示动作、操作人和发生时间。
+- mock 模式同步生成报名操作历史，便于本地前端验证。
+- 自测：
+  - `node --check apps/group_class_frontend/js/app.js`
+  - `node --check apps/group_class_frontend/js/api.js`
+  - `/Users/fayun/.local/bin/uv run pytest tests/group_class_backend/common/test_contract_baseline.py tests/group_class_backend/registrations/test_registration_commands.py tests/test_api/test_registrations_api.py -q`（47 passed）
+  - `/Users/fayun/.local/bin/uv run pytest tests/ -q`（155 passed）
+- Commit：`feat: show registration operation history`
 
 ## 8. 验收口径
 

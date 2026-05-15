@@ -324,6 +324,33 @@ def test_update_notes_persists(client, approved_class_id, public_headers, admin_
     assert detail.json()["data"]["notes"] == "家长希望周三晚"
 
 
+def test_registration_detail_contains_operation_history(client, approved_class_id, public_headers, admin_headers):
+    """TC-R14A: 报名详情返回操作历史。"""
+
+    registration = _submit_enrollment(client, approved_class_id, public_headers)
+    registration_id = registration["registrationId"]
+    client.post(
+        f"/api/v1/admin/registrations/{registration_id}/notes",
+        json={"followUpNote": "已电话确认", "notes": "家长希望周三晚"},
+        headers=admin_headers,
+    )
+    client.post(
+        f"/api/v1/admin/registrations/{registration_id}/status",
+        json={"registrationStatus": "VALID"},
+        headers=admin_headers,
+    )
+
+    detail = client.get(f"/api/v1/admin/registrations/{registration_id}", headers=admin_headers)
+    history = detail.json()["data"]["operationHistory"]
+    actions = [item["action"] for item in history]
+
+    assert detail.status_code == 200
+    assert actions == ["registration.submitted", "registration.notes_updated", "registration.status_updated"]
+    assert history[0]["actorId"] == public_headers["X-Actor-Id"]
+    assert history[1]["metadata"]["hasFollowUpNote"] is True
+    assert history[2]["metadata"]["registrationStatus"] == "VALID"
+
+
 def test_update_status_valid_success(client, approved_class_id, public_headers, admin_headers):
     """TC-R15: 更新状态为 VALID 成功。"""
 

@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 import sqlite3
 from dataclasses import replace
 
-from apps.group_class_backend.audit.interface import NullAuditWriter
+from apps.group_class_backend.audit.interface import InMemoryAuditLog, NullAuditWriter
 from apps.group_class_backend.classes.controller import create_class_draft
 from apps.group_class_backend.classes.repository import InMemoryClassRepository, SQLiteClassRepository
 from apps.group_class_backend.common.error_codes import ErrorCode
@@ -630,6 +630,7 @@ def test_list_registrations_persists_sqlite_filtering_for_initiator() -> None:
 def test_get_registration_detail_and_update_notes_for_owned_class_initiator() -> None:
     class_repository = InMemoryClassRepository()
     registration_repository = InMemoryRegistrationRepository()
+    audit_log = InMemoryAuditLog()
     class_id = _seed_open_class(class_repository)
 
     submit_registration(
@@ -644,7 +645,7 @@ def test_get_registration_detail_and_update_notes_for_owned_class_initiator() ->
         },
         class_repository=class_repository,
         registration_repository=registration_repository,
-        audit_writer=NullAuditWriter(),
+        audit_writer=audit_log,
         request_id="req-registration-detail-seed-001",
         actor_id="parent-001",
         now=datetime(2026, 4, 12, 15, 0, tzinfo=timezone.utc),
@@ -656,6 +657,7 @@ def test_get_registration_detail_and_update_notes_for_owned_class_initiator() ->
         payload={"followUpNote": "已电话联系，待确认试课时间", "notes": "家长偏好周末上午"},
         class_repository=class_repository,
         registration_repository=registration_repository,
+        audit_writer=audit_log,
         request_id="req-registration-note-update-001",
         actor_id="admin-001",
         actor_roles=["INITIATOR"],
@@ -668,6 +670,7 @@ def test_get_registration_detail_and_update_notes_for_owned_class_initiator() ->
         request_id="req-registration-detail-001",
         actor_id="admin-001",
         actor_roles=["INITIATOR"],
+        audit_reader=audit_log,
     )
 
     assert update_response["code"] == ErrorCode.OK
@@ -691,6 +694,30 @@ def test_get_registration_detail_and_update_notes_for_owned_class_initiator() ->
             "notes": "家长偏好周末上午",
             "submittedAt": "2026-04-12T15:00:00+00:00",
             "updatedAt": "2026-04-12T16:00:00+00:00",
+            "operationHistory": [
+                {
+                    "requestId": "req-registration-detail-seed-001",
+                    "actorId": "parent-001",
+                    "action": "registration.submitted",
+                    "occurredAt": detail_response["data"]["operationHistory"][0]["occurredAt"],
+                    "metadata": {
+                        "classId": class_id,
+                        "registerType": "ENROLLMENT",
+                        "registrationStatus": "SUBMITTED",
+                    },
+                },
+                {
+                    "requestId": "req-registration-note-update-001",
+                    "actorId": "admin-001",
+                    "action": "registration.notes_updated",
+                    "occurredAt": detail_response["data"]["operationHistory"][1]["occurredAt"],
+                    "metadata": {
+                        "classId": class_id,
+                        "hasFollowUpNote": True,
+                        "hasNotes": True,
+                    },
+                },
+            ],
         },
     }
 
@@ -953,6 +980,7 @@ def test_update_registration_status_persists_in_sqlite() -> None:
         payload={"followUpNote": "已加入回访清单", "notes": "家长询问教材版本"},
         class_repository=class_repository,
         registration_repository=registration_repository,
+        audit_writer=NullAuditWriter(),
         request_id="req-registration-note-update-sqlite-001",
         actor_id="super-admin-001",
         actor_roles=["SUPER_ADMIN"],

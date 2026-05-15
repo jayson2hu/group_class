@@ -250,6 +250,35 @@ function registrationStatusLabel(status) {
   return mapping[status] || status || "-";
 }
 
+function operationActionLabel(action) {
+  const mapping = {
+    "registration.submitted": "提交报名",
+    "registration.notes_updated": "更新备注",
+    "registration.status_updated": "更新状态",
+    "registration.waitlist_promoted": "候补转正",
+  };
+  return mapping[action] || action || "-";
+}
+
+function operationHistoryHtml(history = []) {
+  if (!history.length) {
+    return '<p class="muted">暂无操作记录。</p>';
+  }
+  return `
+    <div class="operation-timeline">
+      ${history.map((item) => `
+        <div class="operation-item">
+          <span class="operation-dot" aria-hidden="true"></span>
+          <div>
+            <strong>${operationActionLabel(item.action)}</strong>
+            <p class="muted">${item.occurredAt || "-"} · ${item.actorId || "-"}</p>
+          </div>
+        </div>
+      `).join("")}
+    </div>
+  `;
+}
+
 function registrationFilterHtml(filters) {
   const types = ["ENROLLMENT", "WAITLIST", "TRIAL"];
   const statuses = ["SUBMITTED", "VALID", "WAITLISTED", "INVALID", "CANCELLED"];
@@ -1304,6 +1333,10 @@ async function renderAdminRegistrationDetail(registrationId) {
           </form>
           ${promoteButton ? `<div class="actions admin-detail-actions">${promoteButton}</div>` : ""}
           <div class="actions admin-detail-actions"><a class="btn" href="#/admin/registrations">返回报名列表</a></div>
+        </section>
+        <section class="panel admin-side-card">
+          <h3>操作历史</h3>
+          ${operationHistoryHtml(detail.operationHistory || [])}
         </section>
       </aside>
     </section>

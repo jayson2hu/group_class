@@ -126,6 +126,7 @@ def admin_get_registration_detail(
         request_id=new_request_id(),
         actor_id=actor.actor_id,
         actor_roles=actor.actor_roles,
+        audit_reader=state.audit_writer,
     )
     response.status_code = _http_status(result)
     return result
@@ -144,6 +145,7 @@ def admin_update_registration_notes(
         payload=body,
         class_repository=state.class_repository,
         registration_repository=state.registration_repository,
+        audit_writer=state.audit_writer,
         request_id=new_request_id(),
         actor_id=actor.actor_id,
         actor_roles=actor.actor_roles,

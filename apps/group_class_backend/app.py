@@ -8,7 +8,7 @@ from uuid import uuid4
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from apps.group_class_backend.audit.interface import NullAuditWriter
+from apps.group_class_backend.audit.interface import InMemoryAuditLog
 from apps.group_class_backend.classes.repository import InMemoryClassRepository
 from apps.group_class_backend.common.enums import ClassStatus
 from apps.group_class_backend.models.group_class import GroupClass
@@ -21,7 +21,7 @@ class AppState:
         self.class_repository = InMemoryClassRepository()
         self.registration_repository = InMemoryRegistrationRepository()
         self.template_repository = InMemoryTemplateRepository()
-        self.audit_writer = NullAuditWriter()
+        self.audit_writer = InMemoryAuditLog()
         _seed_classes(self.class_repository)
 
 

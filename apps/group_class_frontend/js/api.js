@@ -106,6 +106,15 @@ const mockRegistrations = [
     remark: "希望周三晚",
     followUpNote: "",
     notes: "",
+    operationHistory: [
+      {
+        requestId: "req_mock_001",
+        actorId: "u_anonymous",
+        action: "registration.submitted",
+        occurredAt: "2026-04-13T12:00:00+08:00",
+        metadata: { classId: "cls_001", registerType: "ENROLLMENT", registrationStatus: "SUBMITTED" },
+      },
+    ],
     submittedAt: "2026-04-13T12:00:00+08:00",
     updatedAt: "2026-04-13T12:00:00+08:00",
   },
@@ -283,6 +292,15 @@ export class ApiClient {
         remark: payload.remark,
         followUpNote: payload.followUpNote || "",
         notes: payload.notes || "",
+        operationHistory: [
+          {
+            requestId: `req_${Date.now()}`,
+            actorId: this.actorId,
+            action: "registration.submitted",
+            occurredAt: new Date().toISOString(),
+            metadata: { classId: payload.classId, registerType: payload.registerType, registrationStatus: payload.registerType === "WAITLIST" ? "WAITLISTED" : "SUBMITTED" },
+          },
+        ],
         submittedAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
@@ -629,6 +647,16 @@ export class ApiClient {
         ...mockRegistrations[index],
         followUpNote: payload.followUpNote,
         notes: payload.notes,
+        operationHistory: [
+          ...(mockRegistrations[index].operationHistory || []),
+          {
+            requestId: `req_${Date.now()}`,
+            actorId: this.actorId,
+            action: "registration.notes_updated",
+            occurredAt: new Date().toISOString(),
+            metadata: { classId: mockRegistrations[index].classId, hasFollowUpNote: Boolean(payload.followUpNote), hasNotes: Boolean(payload.notes) },
+          },
+        ],
         updatedAt: new Date().toISOString(),
       };
       return mockRegistrations[index];
@@ -655,6 +683,16 @@ export class ApiClient {
       mockRegistrations[index] = {
         ...mockRegistrations[index],
         registrationStatus: payload.registrationStatus,
+        operationHistory: [
+          ...(mockRegistrations[index].operationHistory || []),
+          {
+            requestId: `req_${Date.now()}`,
+            actorId: this.actorId,
+            action: "registration.status_updated",
+            occurredAt: new Date().toISOString(),
+            metadata: { classId: mockRegistrations[index].classId, previousRegistrationStatus: mockRegistrations[index].registrationStatus, registrationStatus: payload.registrationStatus },
+          },
+        ],
         updatedAt: new Date().toISOString(),
       };
       return mockRegistrations[index];
@@ -681,6 +719,16 @@ export class ApiClient {
       mockRegistrations[index] = {
         ...mockRegistrations[index],
         registrationStatus: "VALID",
+        operationHistory: [
+          ...(mockRegistrations[index].operationHistory || []),
+          {
+            requestId: `req_${Date.now()}`,
+            actorId: this.actorId,
+            action: "registration.waitlist_promoted",
+            occurredAt: new Date().toISOString(),
+            metadata: { classId: mockRegistrations[index].classId },
+          },
+        ],
         updatedAt: new Date().toISOString(),
       };
       return mockRegistrations[index];

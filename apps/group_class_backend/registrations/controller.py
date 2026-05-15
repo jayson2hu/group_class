@@ -5,7 +5,7 @@ from dataclasses import replace
 from io import StringIO
 from uuid import uuid4
 
-from apps.group_class_backend.audit.interface import AuditEvent, AuditWriter
+from apps.group_class_backend.audit.interface import AuditEvent, AuditReader, AuditWriter
 from apps.group_class_backend.classes.repository import InMemoryClassRepository, SQLiteClassRepository
 from apps.group_class_backend.common.enums import ClassStatus
 from apps.group_class_backend.common.error_codes import ErrorCode
@@ -237,6 +237,24 @@ def _serialize_registration_detail(registration: Registration, group_class: Grou
     }
 
 
+def _serialize_audit_event(event: AuditEvent) -> dict[str, object]:
+    return {
+        "requestId": event.request_id,
+        "actorId": event.actor_id,
+        "action": event.action,
+        "occurredAt": event.occurred_at.isoformat(),
+        "metadata": event.metadata,
+    }
+
+
+def _registration_operation_history(audit_reader: AuditReader | None, registration_id: str) -> list[dict[str, object]]:
+    if audit_reader is None:
+        return []
+    events = audit_reader.list_for_resource("registration", registration_id)
+    events.sort(key=lambda event: event.occurred_at)
+    return [_serialize_audit_event(event) for event in events]
+
+
 def list_registrations(
     *,
     class_repository: InMemoryClassRepository | SQLiteClassRepository,
@@ -343,6 +361,7 @@ def get_registration_detail(
     request_id: str,
     actor_id: str,
     actor_roles: list[str] | None = None,
+    audit_reader: AuditReader | None = None,
 ) -> dict[str, object]:
     registration, group_class, error = _get_accessible_registration(
         registration_id=registration_id,
@@ -355,7 +374,9 @@ def get_registration_detail(
     if error is not None:
         return error
 
-    return success_response(request_id=request_id, data=_serialize_registration_detail(registration, group_class))
+    data = _serialize_registration_detail(registration, group_class)
+    data["operationHistory"] = _registration_operation_history(audit_reader, registration.registration_id)
+    return success_response(request_id=request_id, data=data)
 
 
 def update_registration_notes(
@@ -364,6 +385,7 @@ def update_registration_notes(
     payload: dict[str, object],
     class_repository: InMemoryClassRepository | SQLiteClassRepository,
     registration_repository: InMemoryRegistrationRepository | SQLiteRegistrationRepository,
+    audit_writer: AuditWriter,
     request_id: str,
     actor_id: str,
     actor_roles: list[str] | None = None,
@@ -386,6 +408,20 @@ def update_registration_notes(
             follow_up_note=payload.get("followUpNote"),
             notes=payload.get("notes"),
             updated_at=now,
+        )
+    )
+    audit_writer.record(
+        AuditEvent(
+            request_id=request_id,
+            actor_id=actor_id,
+            action="registration.notes_updated",
+            resource_type="registration",
+            resource_id=registration.registration_id,
+            metadata={
+                "classId": group_class.class_id,
+                "hasFollowUpNote": bool(updated_registration.follow_up_note),
+                "hasNotes": bool(updated_registration.notes),
+            },
         )
     )
     return success_response(request_id=request_id, data=_serialize_registration_detail(updated_registration, group_class))
