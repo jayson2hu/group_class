@@ -356,6 +356,25 @@ export class ApiClient {
     return result.data || result;
   }
 
+  async getAdminDashboard() {
+    if (this.useMockData) {
+      return {
+        classCount: mockClasses.length,
+        publishedClassCount: mockClasses.filter((item) => !["DRAFT", "REJECTED", "PENDING_REVIEW"].includes(item.status)).length,
+        pendingReviewCount: mockClasses.filter((item) => item.status === "PENDING_REVIEW").length,
+        openEnrollmentCount: mockClasses.filter((item) => item.status === "OPEN_FOR_ENROLLMENT").length,
+        registrationCount: mockRegistrations.length,
+        submittedRegistrationCount: mockRegistrations.filter((item) => item.registrationStatus === "SUBMITTED").length,
+        waitlistedRegistrationCount: mockRegistrations.filter((item) => item.registrationStatus === "WAITLISTED").length,
+        waitlistIntentCount: mockRegistrations.filter((item) => item.registerType === "WAITLIST").length,
+        totalCurrentStudents: mockClasses.reduce((sum, item) => sum + (item.currentStudents || 0), 0),
+        totalWaitlistCount: mockClasses.reduce((sum, item) => sum + (item.waitlistCount || 0), 0),
+      };
+    }
+    const result = await requestJson(`${this.baseUrl}/api/v1/admin/dashboard`, {}, this.actorId, this.actorRoles);
+    return result.data || result;
+  }
+
   async getAdminClassDetail(classId) {
     if (this.useMockData) {
       const item = mockClasses.find((entry) => entry.classId === classId);

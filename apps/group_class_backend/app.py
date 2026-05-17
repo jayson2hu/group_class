@@ -141,9 +141,11 @@ def health() -> dict[str, str]:
 
 
 from apps.group_class_backend.routers import classes as classes_router
+from apps.group_class_backend.routers import dashboard as dashboard_router
 from apps.group_class_backend.routers import registrations as registrations_router
 from apps.group_class_backend.routers import templates as templates_router
 
 app.include_router(classes_router.router)
+app.include_router(dashboard_router.router)
 app.include_router(registrations_router.router)
 app.include_router(templates_router.router)

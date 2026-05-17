@@ -1562,6 +1562,22 @@ tbody tr:hover {
   grid-template-columns: repeat(4, minmax(120px, 1fr));
 }
 
+.admin-dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(150px, 1fr));
+  gap: 12px;
+}
+
+.dashboard-worklist h3 {
+  margin-bottom: 14px;
+}
+
+.dashboard-worklist-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
 .registration-card-grid {
   grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
 }
@@ -1702,6 +1718,7 @@ tbody tr:hover {
   .class-form-stepper,
   .faq-grid,
   .registration-summary-grid,
+  .admin-dashboard-grid,
   .registration-card-grid,
   .template-card-grid,
   .registration-card-info,

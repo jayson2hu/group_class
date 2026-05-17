@@ -1191,6 +1191,34 @@ async function renderAdminClasses(queryParams = new URLSearchParams()) {
   bindAdminClassQuickActions();
 }
 
+async function renderAdminDashboard() {
+  const data = await api.getAdminDashboard();
+  setHtml(`
+    <section class="panel admin-hero">
+      <div><p class="section-kicker">Operations Dashboard</p><h2>运营看板</h2><p class="muted admin-hero-text">集中查看课程发布、报名跟进和候补压力。</p></div>
+      <div class="actions"><a class="btn primary" href="#/admin/registrations?registrationStatus=SUBMITTED">待确认报名</a><a class="btn" href="#/admin/classes?status=PENDING_REVIEW">待审核课程</a></div>
+    </section>
+    <section class="admin-dashboard-grid">
+      <article class="panel summary-pill"><span class="summary-label">课程总数</span><strong class="summary-value">${data.classCount ?? 0}</strong></article>
+      <article class="panel summary-pill"><span class="summary-label">已发布课程</span><strong class="summary-value">${data.publishedClassCount ?? 0}</strong></article>
+      <article class="panel summary-pill"><span class="summary-label">待审核课程</span><strong class="summary-value">${data.pendingReviewCount ?? 0}</strong></article>
+      <article class="panel summary-pill"><span class="summary-label">报名中课程</span><strong class="summary-value">${data.openEnrollmentCount ?? 0}</strong></article>
+      <article class="panel summary-pill"><span class="summary-label">报名总数</span><strong class="summary-value">${data.registrationCount ?? 0}</strong></article>
+      <article class="panel summary-pill"><span class="summary-label">待确认报名</span><strong class="summary-value">${data.submittedRegistrationCount ?? 0}</strong></article>
+      <article class="panel summary-pill"><span class="summary-label">候补中记录</span><strong class="summary-value">${data.waitlistedRegistrationCount ?? 0}</strong></article>
+      <article class="panel summary-pill"><span class="summary-label">课程候补人数</span><strong class="summary-value">${data.totalWaitlistCount ?? 0}</strong></article>
+    </section>
+    <section class="panel dashboard-worklist">
+      <h3>待处理入口</h3>
+      <div class="dashboard-worklist-actions">
+        <a class="btn" href="#/admin/registrations?registrationStatus=SUBMITTED">查看待确认报名</a>
+        <a class="btn" href="#/admin/registrations?registerType=WAITLIST">查看候补报名</a>
+        <a class="btn" href="#/admin/classes?status=PENDING_REVIEW">查看待审核课程</a>
+      </div>
+    </section>
+  `);
+}
+
 async function renderAdminRegistrations(queryParams = new URLSearchParams()) {
   const page = readPage(queryParams);
   const filters = readRegistrationFilters(queryParams);
@@ -1384,6 +1412,7 @@ async function renderRoute() {
     if (parts[0] === "public" && parts[1] === "classes" && !parts[2]) return await renderPublicList(queryParams);
     if (parts[0] === "public" && parts[1] === "classes" && parts[2]) return await renderPublicDetail(parts[2]);
     if (parts[0] === "public" && parts[1] === "enroll" && parts[2]) return await renderEnroll(parts[2], queryParams);
+    if (parts[0] === "admin" && parts[1] === "dashboard") return await renderAdminDashboard();
     if (parts[0] === "admin" && parts[1] === "classes" && parts[2] === "new") return await renderAdminCreateClass(queryParams);
     if (parts[0] === "admin" && parts[1] === "classes" && parts[3] === "edit") return await renderAdminEditClass(parts[2]);
     if (parts[0] === "admin" && parts[1] === "classes" && !parts[2]) return await renderAdminClasses(queryParams);

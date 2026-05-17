@@ -495,6 +495,7 @@ uv run pytest tests/ -q
 | K6 | 报名详情操作历史 | ✅ 已完成 | `pytest registrations/common` 47 passed; `node --check app.js/api.js`; `uv run pytest tests/ -q` 155 passed | `feat: show registration operation history` |
 | K7 | 创建课程表单分步化 | ✅ 已完成 | `node --check app.js/api.js`; `uv run pytest tests/ -q` 155 passed | `feat: split class creation form into steps` |
 | K8 | 驳回原因结构化 | ✅ 已完成 | `pytest classes api` 72 passed; `node --check app.js/api.js`; `uv run pytest tests/ -q` 155 passed | `feat: structure class rejection reasons` |
+| K9 | 运营看板 MVP | ✅ 已完成 | `pytest dashboard_api` 2 passed; `node --check app.js/api.js`; `uv run pytest tests/ -q` 157 passed | `feat: add admin operations dashboard` |
 
 ---
 
@@ -604,6 +605,19 @@ uv run pytest tests/ -q
   - `/Users/fayun/.local/bin/uv run pytest tests/group_class_backend/classes/test_class_queries_and_update.py tests/test_api/test_classes_api.py -q`（72 passed）
   - `/Users/fayun/.local/bin/uv run pytest tests/ -q`（155 passed）
 - Commit：`feat: structure class rejection reasons`
+
+### K9 完成记录（2026-05-14）
+
+- 新增 `GET /api/v1/admin/dashboard`，返回课程、报名、待审核、候补等运营核心指标。
+- 新增后台运营看板页面 `#/admin/dashboard`，展示指标卡和待处理入口。
+- 后台导航增加“运营看板”入口。
+- mock API 支持同一 dashboard 数据结构。
+- 自测：
+  - `node --check apps/group_class_frontend/js/app.js`
+  - `node --check apps/group_class_frontend/js/api.js`
+  - `/Users/fayun/.local/bin/uv run pytest tests/test_api/test_dashboard_api.py -q`（2 passed）
+  - `/Users/fayun/.local/bin/uv run pytest tests/ -q`（157 passed）
+- Commit：`feat: add admin operations dashboard`
 
 ## 8. 验收口径
 
