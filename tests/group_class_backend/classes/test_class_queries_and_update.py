@@ -1639,6 +1639,31 @@ def test_public_class_detail_returns_similar_classes() -> None:
     assert response["data"]["similarClasses"][0]["primaryAction"] == "enroll"
 
 
+def test_public_list_hides_classes_after_signup_deadline() -> None:
+    repository = InMemoryClassRepository()
+    class_id = _seed_class(repository)
+    current = repository.get(class_id)
+    assert current is not None
+    repository.update(
+        replace(
+            current,
+            status=ClassStatus.OPEN_FOR_ENROLLMENT,
+            signup_deadline=datetime(2020, 1, 1, tzinfo=timezone.utc),
+        )
+    )
+
+    response = list_classes(
+        repository=repository,
+        request_id="req-public-list-expired-001",
+        page=1,
+        page_size=10,
+        public_only=True,
+    )
+
+    assert response["code"] == ErrorCode.OK
+    assert response["data"]["total"] == 0
+
+
 
 def test_get_class_detail_returns_not_found() -> None:
     repository = InMemoryClassRepository()

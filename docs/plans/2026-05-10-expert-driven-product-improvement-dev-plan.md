@@ -498,6 +498,7 @@ uv run pytest tests/ -q
 | K9 | 运营看板 MVP | ✅ 已完成 | `pytest dashboard_api` 2 passed; `node --check app.js/api.js`; `uv run pytest tests/ -q` 157 passed | `feat: add admin operations dashboard` |
 | K10 | CSV 导出字段增强 | ✅ 已完成 | `pytest registrations` 41 passed; `node --check app.js/api.js`; `uv run pytest tests/ -q` 157 passed | `feat: expand registration csv export` |
 | K11 | 相近课程自动推荐 | ✅ 已完成 | `pytest classes api` 73 passed; `node --check app.js/api.js`; `uv run pytest tests/ -q` 158 passed | `feat: recommend similar classes` |
+| K12 | 报名截止自动关闭 | ✅ 已完成 | `pytest classes/registrations/api` 116 passed; `node --check app.js/api.js`; `uv run pytest tests/ -q` 160 passed | `feat: enforce signup deadlines` |
 
 ---
 
@@ -645,6 +646,19 @@ uv run pytest tests/ -q
   - `/Users/fayun/.local/bin/uv run pytest tests/group_class_backend/classes/test_class_queries_and_update.py tests/test_api/test_classes_api.py -q`（73 passed）
   - `/Users/fayun/.local/bin/uv run pytest tests/ -q`（158 passed）
 - Commit：`feat: recommend similar classes`
+
+### K12 完成记录（2026-05-14）
+
+- 公开课程列表和公开详情自动隐藏已过报名截止时间的可报名课程。
+- 报名提交时校验 `signupDeadline`，过期后返回 400 和 `signupDeadline` 错误详情。
+- 前端错误翻译新增“报名已截止”。
+- demo 种子课程截止日期调整到未来，避免本地演示数据因当前日期过期而空列表。
+- 自测：
+  - `node --check apps/group_class_frontend/js/app.js`
+  - `node --check apps/group_class_frontend/js/api.js`
+  - `/Users/fayun/.local/bin/uv run pytest tests/group_class_backend/classes/test_class_queries_and_update.py tests/group_class_backend/registrations/test_registration_commands.py tests/test_api/test_classes_api.py tests/test_api/test_registrations_api.py -q`（116 passed）
+  - `/Users/fayun/.local/bin/uv run pytest tests/ -q`（160 passed）
+- Commit：`feat: enforce signup deadlines`
 
 ## 8. 验收口径
 

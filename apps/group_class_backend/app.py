@@ -64,7 +64,7 @@ def _seed_classes(class_repository: InMemoryClassRepository) -> None:
         current_students=4,
         start_date=datetime(2026, 4, 20, tzinfo=timezone.utc),
         end_date=datetime(2026, 6, 20, tzinfo=timezone.utc),
-        signup_deadline=datetime(2026, 4, 18, 23, 59, tzinfo=timezone.utc),
+        signup_deadline=datetime(2026, 12, 18, 23, 59, tzinfo=timezone.utc),
         updated_at=now,
     )
     class_repository.save(class_open)
@@ -95,7 +95,7 @@ def _seed_classes(class_repository: InMemoryClassRepository) -> None:
         waitlist_count=2,
         start_date=datetime(2026, 4, 25, tzinfo=timezone.utc),
         end_date=datetime(2026, 7, 25, tzinfo=timezone.utc),
-        signup_deadline=datetime(2026, 4, 23, 23, 59, tzinfo=timezone.utc),
+        signup_deadline=datetime(2026, 12, 23, 23, 59, tzinfo=timezone.utc),
         updated_at=now,
     )
     class_repository.save(class_full)

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 from dataclasses import replace
+from datetime import timezone
 from io import StringIO
 from uuid import uuid4
 
@@ -72,6 +73,19 @@ def _validate_class_status(group_class_status: ClassStatus, registration_type: R
             "status",
             f"class status does not accept {registration_type.value} registration",
         )
+
+
+def _validate_signup_deadline(group_class: GroupClass, now) -> None:
+    if group_class.signup_deadline is None:
+        return
+    deadline = group_class.signup_deadline
+    if deadline.tzinfo is None:
+        deadline = deadline.replace(tzinfo=timezone.utc)
+    current = now
+    if current.tzinfo is None:
+        current = current.replace(tzinfo=timezone.utc)
+    if current > deadline:
+        raise _PayloadError("signupDeadline", "class signup deadline has passed")
 
 
 def _serialize_result(registration: Registration, class_status: ClassStatus, waitlist_count: int | None = None) -> dict[str, object]:
@@ -606,6 +620,7 @@ def submit_registration(
     try:
         registration_type = _parse_registration_type(payload.get("registerType"))
         _validate_class_status(group_class.status, registration_type)
+        _validate_signup_deadline(group_class, now)
         registration = Registration.create(
             registration_id=f"reg-{uuid4().hex[:12]}",
             class_id=group_class.class_id,

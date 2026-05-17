@@ -380,6 +380,38 @@ def test_submit_registration_rejects_waitlist_for_non_waitlist_status() -> None:
     }
 
 
+def test_submit_registration_rejects_after_signup_deadline() -> None:
+    class_repository = InMemoryClassRepository()
+    registration_repository = InMemoryRegistrationRepository()
+    class_id = _seed_open_class(class_repository)
+    current = class_repository.get(class_id)
+    assert current is not None
+    class_repository.update(replace(current, signup_deadline=datetime(2026, 4, 12, 14, 0, tzinfo=timezone.utc)))
+
+    response = submit_registration(
+        payload={
+            "classId": class_id,
+            "registerType": "ENROLLMENT",
+            "parentName": "张女士",
+            "contactInfo": "13800000000",
+            "studentName": "张三",
+            "studentGrade": "三年级",
+        },
+        class_repository=class_repository,
+        registration_repository=registration_repository,
+        audit_writer=NullAuditWriter(),
+        request_id="req-registration-expired-deadline-001",
+        actor_id="parent-001",
+        now=datetime(2026, 4, 12, 15, 0, tzinfo=timezone.utc),
+    )
+
+    assert response == {
+        "requestId": "req-registration-expired-deadline-001",
+        "code": ErrorCode.VALIDATION_INVALID_ARGUMENT,
+        "details": [{"field": "signupDeadline", "message": "class signup deadline has passed"}],
+    }
+
+
 def test_submit_registration_persists_sqlite_flow() -> None:
     connection = sqlite3.connect(":memory:")
     apply_schema(connection)

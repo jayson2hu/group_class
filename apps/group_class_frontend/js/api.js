@@ -188,6 +188,7 @@ const ERROR_MAP = {
   "current class status cannot be cancelled": "当前课程状态不可取消",
   "class status does not accept ENROLLMENT registration": "当前课程状态不接受报名",
   "class status does not accept WAITLIST registration": "当前课程状态不接受候补",
+  "class signup deadline has passed": "报名已截止",
   "class not found": "课程不存在",
   "template not found": "模板不存在",
   "registration not found": "报名记录不存在",

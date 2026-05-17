@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Protocol
 
 from apps.group_class_backend.audit.interface import AuditEvent, AuditWriter
@@ -143,6 +143,14 @@ _PUBLIC_VISIBLE_STATUSES = {
     ClassStatus.IN_PROGRESS,
 }
 
+_ENROLLMENT_ACCEPTING_STATUSES = {
+    ClassStatus.OPEN_FOR_ENROLLMENT,
+    ClassStatus.ALMOST_CONFIRMED,
+    ClassStatus.CONFIRMED,
+    ClassStatus.FULL,
+    ClassStatus.WAITLIST_OPEN,
+}
+
 _STATUS_LABELS: dict[ClassStatus, str] = {
     ClassStatus.OPEN_FOR_ENROLLMENT: "报名中",
     ClassStatus.ALMOST_CONFIRMED: "即将成班",
@@ -279,6 +287,16 @@ def _serialize_public_class(group_class: GroupClass) -> dict[str, object]:
         "actions": ["view"],
         "updatedAt": group_class.updated_at.isoformat(),
     }
+
+
+def _is_signup_expired(group_class: GroupClass, now: datetime | None = None) -> bool:
+    if group_class.signup_deadline is None or group_class.status not in _ENROLLMENT_ACCEPTING_STATUSES:
+        return False
+    current = now or datetime.now(timezone.utc)
+    deadline = group_class.signup_deadline
+    if deadline.tzinfo is None:
+        deadline = deadline.replace(tzinfo=timezone.utc)
+    return current > deadline
 
 
 def _similar_public_classes(repository: InMemoryClassRepository, current: GroupClass, limit: int = 3) -> list[dict[str, object]]:
@@ -829,6 +847,8 @@ def get_class_detail(
         return _not_found_error(request_id)
     if public_only and group_class.status not in _PUBLIC_VISIBLE_STATUSES:
         return _not_found_error(request_id)
+    if public_only and _is_signup_expired(group_class):
+        return _not_found_error(request_id)
     data = _serialize_public_class(group_class) if public_only else _serialize_class(group_class)
     if public_only:
         data["similarClasses"] = _similar_public_classes(repository, group_class)
@@ -850,6 +870,7 @@ def list_classes(
     all_items = sorted(repository.list(), key=lambda item: item.updated_at, reverse=True)
     if public_only:
         all_items = [item for item in all_items if item.status in _PUBLIC_VISIBLE_STATUSES]
+        all_items = [item for item in all_items if not _is_signup_expired(item)]
     if status_filter:
         allowed_statuses = {status for status in status_filter if status}
         all_items = [item for item in all_items if item.status.value in allowed_statuses]
