@@ -548,16 +548,21 @@ export class ApiClient {
     return result.data || result;
   }
 
-  async rejectReview(classId, version) {
+  async rejectReview(classId, version, reason = {}) {
     if (this.useMockData) {
-      return this.mockReviewStatus(classId, version, "REJECTED");
+      const result = this.mockReviewStatus(classId, version, "REJECTED");
+      result.reviewRejection = {
+        reasonCode: reason.reasonCode || "OTHER",
+        reasonText: reason.reasonText || "",
+      };
+      return result;
     }
     const result = await requestJson(
       `${this.baseUrl}/api/v1/admin/classes/${classId}/reject`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ version }),
+        body: JSON.stringify({ version, ...reason }),
       },
       this.actorId,
       this.actorRoles

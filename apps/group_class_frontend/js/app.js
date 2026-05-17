@@ -279,6 +279,15 @@ function operationHistoryHtml(history = []) {
   `;
 }
 
+function promptRejectReason() {
+  const reasonText = window.prompt("请输入驳回原因，便于发起人修改课程。", "课程信息需要补充完善");
+  if (reasonText === null) return null;
+  return {
+    reasonCode: "CONTENT_INCOMPLETE",
+    reasonText: reasonText.trim(),
+  };
+}
+
 function registrationFilterHtml(filters) {
   const types = ["ENROLLMENT", "WAITLIST", "TRIAL"];
   const statuses = ["SUBMITTED", "VALID", "WAITLISTED", "INVALID", "CANCELLED"];
@@ -1024,10 +1033,12 @@ function bindDetailReview(detail) {
     }
   });
   if (rejectBtn) rejectBtn.addEventListener("click", async () => {
+    const rejection = promptRejectReason();
+    if (rejection === null) return;
     if (!window.confirm("确认驳回？")) return;
     const restore = setButtonLoading(rejectBtn, "处理中...");
     try {
-      await api.rejectReview(detail.classId, detail.version);
+      await api.rejectReview(detail.classId, detail.version, rejection);
       showToast("已驳回", "success");
       await renderAdminClassDetail(detail.classId);
     } catch (error) {

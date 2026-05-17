@@ -494,6 +494,7 @@ uv run pytest tests/ -q
 | K5 | 发布前课程完整性校验 | ✅ 已完成 | `pytest classes/registrations` 92 passed; `node --check app.js/api.js`; `uv run pytest tests/ -q` 154 passed | `feat: validate class readiness before review` |
 | K6 | 报名详情操作历史 | ✅ 已完成 | `pytest registrations/common` 47 passed; `node --check app.js/api.js`; `uv run pytest tests/ -q` 155 passed | `feat: show registration operation history` |
 | K7 | 创建课程表单分步化 | ✅ 已完成 | `node --check app.js/api.js`; `uv run pytest tests/ -q` 155 passed | `feat: split class creation form into steps` |
+| K8 | 驳回原因结构化 | ✅ 已完成 | `pytest classes api` 72 passed; `node --check app.js/api.js`; `uv run pytest tests/ -q` 155 passed | `feat: structure class rejection reasons` |
 
 ---
 
@@ -589,6 +590,20 @@ uv run pytest tests/ -q
   - `node --check apps/group_class_frontend/js/api.js`
   - `/Users/fayun/.local/bin/uv run pytest tests/ -q`（155 passed）
 - Commit：`feat: split class creation form into steps`
+
+### K8 完成记录（2026-05-14）
+
+- 课程驳回接口支持 `reasonCode` 和 `reasonText` 结构化原因。
+- 驳回成功响应返回 `reviewRejection`，便于前端或后续通知展示。
+- 审计事件 `class.review_rejected` 记录结构化驳回原因。
+- 后台详情页驳回按钮会收集驳回原因后提交。
+- mock 审核流同步返回驳回原因结构。
+- 自测：
+  - `node --check apps/group_class_frontend/js/app.js`
+  - `node --check apps/group_class_frontend/js/api.js`
+  - `/Users/fayun/.local/bin/uv run pytest tests/group_class_backend/classes/test_class_queries_and_update.py tests/test_api/test_classes_api.py -q`（72 passed）
+  - `/Users/fayun/.local/bin/uv run pytest tests/ -q`（155 passed）
+- Commit：`feat: structure class rejection reasons`
 
 ## 8. 验收口径
 

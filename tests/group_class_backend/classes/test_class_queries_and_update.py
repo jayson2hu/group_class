@@ -2,7 +2,7 @@ from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 import sqlite3
 
-from apps.group_class_backend.audit.interface import NullAuditWriter
+from apps.group_class_backend.audit.interface import InMemoryAuditLog, NullAuditWriter
 from apps.group_class_backend.classes.controller import (
     approve_class_review,
     cancel_class,
@@ -698,12 +698,13 @@ def test_sqlite_repository_persists_approve_review_flow() -> None:
 
 def test_reject_class_review_transitions_pending_review_to_rejected() -> None:
     repository = InMemoryClassRepository()
+    audit_writer = InMemoryAuditLog()
     class_id = _seed_class(repository)
     submit_class_review(
         class_id=class_id,
         payload={"version": 1},
         repository=repository,
-        audit_writer=NullAuditWriter(),
+        audit_writer=audit_writer,
         request_id="req-submit-review-before-reject-001",
         actor_id="initiator-001",
         now=datetime(2026, 4, 12, 13, 30, tzinfo=timezone.utc),
@@ -711,9 +712,9 @@ def test_reject_class_review_transitions_pending_review_to_rejected() -> None:
 
     response = reject_class_review(
         class_id=class_id,
-        payload={"version": 2},
+        payload={"version": 2, "reasonCode": "CONTENT_INCOMPLETE", "reasonText": "请补充课程亮点"},
         repository=repository,
-        audit_writer=NullAuditWriter(),
+        audit_writer=audit_writer,
         request_id="req-reject-review-001",
         actor_id="reviewer-001",
         actor_roles=["CLASS_ADMIN"],
@@ -726,6 +727,10 @@ def test_reject_class_review_transitions_pending_review_to_rejected() -> None:
     assert response["data"]["version"] == 3
     assert response["data"]["actions"] == ["view", "edit", "submit_review"]
     assert response["data"]["reviewerId"] == "reviewer-001"
+    assert response["data"]["reviewRejection"] == {"reasonCode": "CONTENT_INCOMPLETE", "reasonText": "请补充课程亮点"}
+    history = audit_writer.list_for_resource("class", class_id)
+    assert history[-1].metadata["reasonCode"] == "CONTENT_INCOMPLETE"
+    assert history[-1].metadata["reasonText"] == "请补充课程亮点"
     assert persisted is not None
     assert persisted.reviewer_id == "reviewer-001"
 

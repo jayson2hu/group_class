@@ -301,12 +301,13 @@ def test_reject_review_transitions_to_rejected(client, initiator_headers, admin_
     submitted = _submit_review(client, created["classId"], created["version"], initiator_headers)
     response = client.post(
         f"/api/v1/admin/classes/{created['classId']}/reject",
-        json={"version": submitted["version"]},
+        json={"version": submitted["version"], "reasonCode": "CONTENT_INCOMPLETE", "reasonText": "请补充课程亮点"},
         headers=admin_headers,
     )
 
     assert response.status_code == 200
     assert response.json()["data"]["status"] == "REJECTED"
+    assert response.json()["data"]["reviewRejection"] == {"reasonCode": "CONTENT_INCOMPLETE", "reasonText": "请补充课程亮点"}
 
 
 def test_rejected_class_is_hidden_publicly(client, initiator_headers, admin_headers):

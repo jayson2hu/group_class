@@ -193,6 +193,17 @@ def _serialize_class(group_class: GroupClass) -> dict[str, object]:
     }
 
 
+def _class_response_with_review_rejection(data: dict[str, object], payload: dict[str, object]) -> dict[str, object]:
+    reason_code = str(payload.get("reasonCode") or "").strip()
+    reason_text = str(payload.get("reasonText") or "").strip()
+    if reason_code or reason_text:
+        data["reviewRejection"] = {
+            "reasonCode": reason_code or "OTHER",
+            "reasonText": reason_text,
+        }
+    return data
+
+
 
 def _status_label(status: ClassStatus) -> str:
     return _STATUS_LABELS.get(status, status.value)
@@ -718,6 +729,8 @@ def reject_class_review(
 
     candidate = replace(current, status=ClassStatus.REJECTED, reviewer_id=actor_id, updated_at=now)
     saved = repository.update(candidate)
+    reason_code = str(payload.get("reasonCode") or "").strip() or "OTHER"
+    reason_text = str(payload.get("reasonText") or "").strip()
     audit_writer.record(
         AuditEvent(
             request_id=request_id,
@@ -729,10 +742,12 @@ def reject_class_review(
                 "previousStatus": current.status.value,
                 "status": saved.status.value,
                 "version": saved.version,
+                "reasonCode": reason_code,
+                "reasonText": reason_text,
             },
         )
     )
-    return success_response(request_id=request_id, data=_serialize_class(saved))
+    return success_response(request_id=request_id, data=_class_response_with_review_rejection(_serialize_class(saved), payload))
 
 
 def cancel_class(
