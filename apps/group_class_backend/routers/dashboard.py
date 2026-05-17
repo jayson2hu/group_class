@@ -61,6 +61,12 @@ def _notification_preview(payload: dict[str, object]) -> dict[str, object]:
     }
 
 
+def _rate(numerator: int, denominator: int) -> float:
+    if denominator <= 0:
+        return 0.0
+    return round(numerator / denominator, 4)
+
+
 @router.get("/api/v1/admin/dashboard")
 def admin_dashboard(response: Response, actor: ActorContext = Depends(get_actor)) -> dict[str, object]:
     if not _can_view_dashboard(actor.actor_roles):
@@ -82,19 +88,26 @@ def admin_dashboard(response: Response, actor: ActorContext = Depends(get_actor)
         ClassStatus.WAITLIST_OPEN,
         ClassStatus.IN_PROGRESS,
     }
+    published_class_count = sum(1 for item in classes if item.status in published_statuses)
+    full_class_count = sum(1 for item in classes if item.status in {ClassStatus.FULL, ClassStatus.WAITLIST_OPEN})
+    valid_registration_count = sum(1 for item in registrations if item.status == RegistrationStatus.VALID)
     result = {
         "code": ErrorCode.OK.value,
         "data": {
             "classCount": len(classes),
-            "publishedClassCount": sum(1 for item in classes if item.status in published_statuses),
+            "publishedClassCount": published_class_count,
             "pendingReviewCount": sum(1 for item in classes if item.status == ClassStatus.PENDING_REVIEW),
             "openEnrollmentCount": sum(1 for item in classes if item.status == ClassStatus.OPEN_FOR_ENROLLMENT),
             "registrationCount": len(registrations),
             "submittedRegistrationCount": sum(1 for item in registrations if item.status == RegistrationStatus.SUBMITTED),
+            "validRegistrationCount": valid_registration_count,
             "waitlistedRegistrationCount": sum(1 for item in registrations if item.status == RegistrationStatus.WAITLISTED),
             "waitlistIntentCount": sum(1 for item in registrations if item.registration_type == RegistrationType.WAITLIST),
             "totalCurrentStudents": sum(item.current_students for item in classes),
             "totalWaitlistCount": sum(item.waitlist_count for item in classes),
+            "fullClassRate": _rate(full_class_count, published_class_count),
+            "registrationConversionRate": _rate(valid_registration_count, len(registrations)),
+            "averageRegistrationsPerPublishedClass": round(len(registrations) / published_class_count, 2) if published_class_count else 0.0,
         },
     }
     response.status_code = _http_status(result)

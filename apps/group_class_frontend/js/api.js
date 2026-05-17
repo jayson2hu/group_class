@@ -375,6 +375,9 @@ export class ApiClient {
         waitlistIntentCount: mockRegistrations.filter((item) => item.registerType === "WAITLIST").length,
         totalCurrentStudents: mockClasses.reduce((sum, item) => sum + (item.currentStudents || 0), 0),
         totalWaitlistCount: mockClasses.reduce((sum, item) => sum + (item.waitlistCount || 0), 0),
+        fullClassRate: 0.5,
+        registrationConversionRate: 0,
+        averageRegistrationsPerPublishedClass: 0.5,
       };
     }
     const result = await requestJson(`${this.baseUrl}/api/v1/admin/dashboard`, {}, this.actorId, this.actorRoles);

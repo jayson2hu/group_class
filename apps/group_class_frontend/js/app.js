@@ -250,6 +250,11 @@ function registrationStatusLabel(status) {
   return mapping[status] || status || "-";
 }
 
+function formatRate(value) {
+  const numeric = Number(value || 0);
+  return `${Math.round(numeric * 100)}%`;
+}
+
 function operationActionLabel(action) {
   const mapping = {
     "registration.submitted": "提交报名",
@@ -1217,6 +1222,12 @@ async function renderAdminDashboard() {
       <article class="panel summary-pill"><span class="summary-label">待确认报名</span><strong class="summary-value">${data.submittedRegistrationCount ?? 0}</strong></article>
       <article class="panel summary-pill"><span class="summary-label">候补中记录</span><strong class="summary-value">${data.waitlistedRegistrationCount ?? 0}</strong></article>
       <article class="panel summary-pill"><span class="summary-label">课程候补人数</span><strong class="summary-value">${data.totalWaitlistCount ?? 0}</strong></article>
+    </section>
+    <section class="admin-dashboard-grid dashboard-business-grid">
+      <article class="panel summary-pill"><span class="summary-label">满班率</span><strong class="summary-value">${formatRate(data.fullClassRate)}</strong></article>
+      <article class="panel summary-pill"><span class="summary-label">报名转化率</span><strong class="summary-value">${formatRate(data.registrationConversionRate)}</strong></article>
+      <article class="panel summary-pill"><span class="summary-label">有效报名</span><strong class="summary-value">${data.validRegistrationCount ?? 0}</strong></article>
+      <article class="panel summary-pill"><span class="summary-label">平均报名/发布课</span><strong class="summary-value">${data.averageRegistrationsPerPublishedClass ?? 0}</strong></article>
     </section>
     <section class="panel dashboard-worklist">
       <h3>待处理入口</h3>

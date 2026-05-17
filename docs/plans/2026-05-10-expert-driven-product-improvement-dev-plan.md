@@ -500,6 +500,7 @@ uv run pytest tests/ -q
 | K11 | 相近课程自动推荐 | ✅ 已完成 | `pytest classes api` 73 passed; `node --check app.js/api.js`; `uv run pytest tests/ -q` 158 passed | `feat: recommend similar classes` |
 | K12 | 报名截止自动关闭 | ✅ 已完成 | `pytest classes/registrations/api` 116 passed; `node --check app.js/api.js`; `uv run pytest tests/ -q` 160 passed | `feat: enforce signup deadlines` |
 | K13 | 自动通知接口预留 | ✅ 已完成 | `pytest dashboard_api` 4 passed; `uv run pytest tests/ -q` 162 passed | `feat: add notification preview endpoint` |
+| K14 | 经营数据分析看板增强 | ✅ 已完成 | `pytest dashboard_api` 4 passed; `node --check app.js/api.js`; `uv run pytest tests/ -q` 162 passed | `feat: enhance business dashboard metrics` |
 
 ---
 
@@ -671,6 +672,18 @@ uv run pytest tests/ -q
   - `/Users/fayun/.local/bin/uv run pytest tests/test_api/test_dashboard_api.py -q`（4 passed）
   - `/Users/fayun/.local/bin/uv run pytest tests/ -q`（162 passed）
 - Commit：`feat: add notification preview endpoint`
+
+### K14 完成记录（2026-05-14）
+
+- 运营看板新增经营指标：满班率、报名转化率、有效报名数、平均报名/发布课。
+- Dashboard API 返回 `fullClassRate`、`registrationConversionRate`、`validRegistrationCount`、`averageRegistrationsPerPublishedClass`。
+- 前端运营看板新增经营指标区块，mock 数据同步补齐字段。
+- 自测：
+  - `node --check apps/group_class_frontend/js/app.js`
+  - `node --check apps/group_class_frontend/js/api.js`
+  - `/Users/fayun/.local/bin/uv run pytest tests/test_api/test_dashboard_api.py -q`（4 passed）
+  - `/Users/fayun/.local/bin/uv run pytest tests/ -q`（162 passed）
+- Commit：`feat: enhance business dashboard metrics`
 
 ## 8. 验收口径
 

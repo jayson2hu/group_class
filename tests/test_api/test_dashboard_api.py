@@ -17,6 +17,9 @@ def test_admin_dashboard_returns_core_metrics(client, admin_headers):
     assert data["registrationCount"] == 0
     assert data["totalCurrentStudents"] >= 12
     assert data["totalWaitlistCount"] >= 2
+    assert data["fullClassRate"] >= 0
+    assert data["registrationConversionRate"] == 0
+    assert data["averageRegistrationsPerPublishedClass"] == 0
 
 
 def test_admin_notification_preview_returns_dry_run_message(client, admin_headers):

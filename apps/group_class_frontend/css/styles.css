@@ -1600,6 +1600,10 @@ tbody tr:hover {
   margin-bottom: 14px;
 }
 
+.dashboard-business-grid {
+  margin-top: 12px;
+}
+
 .dashboard-worklist-actions {
   display: flex;
   flex-wrap: wrap;
