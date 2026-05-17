@@ -663,6 +663,52 @@ img {
   min-height: 80px;
 }
 
+.class-form-stepper {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.class-form-stepper span {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(191, 219, 254, 0.9);
+  background: rgba(239, 246, 255, 0.72);
+  color: var(--text-soft);
+  font-weight: 800;
+}
+
+.class-form-stepper strong {
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--primary);
+  color: #fff;
+  font-size: 13px;
+}
+
+.class-form-step {
+  position: relative;
+}
+
+.step-badge {
+  display: inline-block;
+  margin-bottom: 12px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: var(--primary-soft);
+  color: var(--primary-strong);
+  font-size: 12px;
+  font-weight: 800;
+}
+
 .checkbox-row {
   display: flex;
   align-items: flex-start;
@@ -1653,6 +1699,7 @@ tbody tr:hover {
   .admin-detail-facts,
   .success-grid,
   .success-step-list,
+  .class-form-stepper,
   .faq-grid,
   .registration-summary-grid,
   .registration-card-grid,

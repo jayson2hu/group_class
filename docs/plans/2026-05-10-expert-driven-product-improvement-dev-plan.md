@@ -493,6 +493,7 @@ uv run pytest tests/ -q
 | K4 | 报名列表状态筛选和待跟进视图 | ✅ 已完成 | `pytest test_registrations_api.py` 20 passed; `node --check app.js/api.js`; `uv run pytest tests/ -q` 152 passed | `feat: filter admin registrations` |
 | K5 | 发布前课程完整性校验 | ✅ 已完成 | `pytest classes/registrations` 92 passed; `node --check app.js/api.js`; `uv run pytest tests/ -q` 154 passed | `feat: validate class readiness before review` |
 | K6 | 报名详情操作历史 | ✅ 已完成 | `pytest registrations/common` 47 passed; `node --check app.js/api.js`; `uv run pytest tests/ -q` 155 passed | `feat: show registration operation history` |
+| K7 | 创建课程表单分步化 | ✅ 已完成 | `node --check app.js/api.js`; `uv run pytest tests/ -q` 155 passed | `feat: split class creation form into steps` |
 
 ---
 
@@ -576,6 +577,18 @@ uv run pytest tests/ -q
   - `/Users/fayun/.local/bin/uv run pytest tests/group_class_backend/common/test_contract_baseline.py tests/group_class_backend/registrations/test_registration_commands.py tests/test_api/test_registrations_api.py -q`（47 passed）
   - `/Users/fayun/.local/bin/uv run pytest tests/ -q`（155 passed）
 - Commit：`feat: show registration operation history`
+
+### K7 完成记录（2026-05-14）
+
+- 新建课程表单新增 3 步视觉结构：基础信息、拼课规则、展示文案。
+- 新建页展示步骤导航和 Step 标识，降低长表单一次性填写压力。
+- 编辑课程保留完整表单，不影响已有后台修改效率。
+- 保存逻辑、字段名称和接口 payload 保持不变，降低回归风险。
+- 自测：
+  - `node --check apps/group_class_frontend/js/app.js`
+  - `node --check apps/group_class_frontend/js/api.js`
+  - `/Users/fayun/.local/bin/uv run pytest tests/ -q`（155 passed）
+- Commit：`feat: split class creation form into steps`
 
 ## 8. 验收口径
 

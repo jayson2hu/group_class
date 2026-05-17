@@ -725,13 +725,22 @@ function adminClassFormHtml(detail = {}, isEdit = false, templates = []) {
   const templateSelect = isEdit ? "" : `
           <div class="row full-span"><label>课程模板</label><select name="templateId"><option value="">不使用模板</option>${templateOptions}</select></div>
   `;
+  const stepNav = isEdit ? "" : `
+      <div class="class-form-stepper" aria-label="创建课程步骤">
+        <span><strong>1</strong>基础信息</span>
+        <span><strong>2</strong>拼课规则</span>
+        <span><strong>3</strong>展示文案</span>
+      </div>
+  `;
   return `
     <section class="panel admin-hero">
       <div><p class="section-kicker">Admin Class Form</p><h2>${isEdit ? "编辑课程" : "创建新课程"}</h2><p class="muted admin-hero-text">${isEdit ? "修改课程字段并保存草稿版本。" : "填写课程信息并保存草稿，后续提交审核。"}</p></div>
     </section>
     <form id="admin-class-form" class="panel admin-class-form">
       <input type="hidden" name="version" value="${detail.version || ""}" />
-      <section class="form-section">
+      ${stepNav}
+      <section class="form-section ${isEdit ? "" : "class-form-step"}">
+        ${isEdit ? "" : '<span class="step-badge">Step 1</span>'}
         <div class="form-section-head"><h3>基础信息</h3><p class="muted">课程基本属性与价格配置。</p></div>
         <div class="form-grid two-columns">
           ${templateSelect}
@@ -744,7 +753,8 @@ function adminClassFormHtml(detail = {}, isEdit = false, templates = []) {
           <div class="row"><label>订金金额</label><input name="depositAmount" type="number" min="0" value="${detail.depositAmount ?? ""}" /></div>
         </div>
       </section>
-      <section class="form-section">
+      <section class="form-section ${isEdit ? "" : "class-form-step"}">
+        ${isEdit ? "" : '<span class="step-badge">Step 2</span>'}
         <div class="form-section-head"><h3>拼课规则</h3><p class="muted">成班人数、课时与时间配置。</p></div>
         <div class="form-grid two-columns">
           <div class="row"><label>最少人数</label><input name="minStudents" type="number" min="1" value="${detail.minStudents ?? ""}" /></div>
@@ -756,7 +766,8 @@ function adminClassFormHtml(detail = {}, isEdit = false, templates = []) {
           <div class="row full-span"><label>报名截止</label><input name="signupDeadline" type="datetime-local" value="${detail.signupDeadline ? detail.signupDeadline.slice(0, 16) : ""}" /></div>
         </div>
       </section>
-      <section class="form-section">
+      <section class="form-section ${isEdit ? "" : "class-form-step"}">
+        ${isEdit ? "" : '<span class="step-badge">Step 3</span>'}
         <div class="form-section-head"><h3>展示文案</h3><p class="muted">用于前台详情页展示的文案与规则说明。</p></div>
         <div class="form-grid two-columns">
           <div class="row full-span"><label>适合对象</label><textarea name="targetAudience">${detail.targetAudience || ""}</textarea></div>
