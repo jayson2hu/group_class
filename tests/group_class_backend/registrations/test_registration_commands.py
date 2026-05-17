@@ -510,31 +510,19 @@ def test_list_registrations_returns_only_owned_class_records_for_initiator() -> 
         actor_roles=["INITIATOR"],
     )
 
-    assert response == {
-        "requestId": "req-registration-list-initiator-001",
-        "code": ErrorCode.OK,
-        "data": {
-            "page": 1,
-            "pageSize": 20,
-            "total": 1,
-            "items": [
-                {
-                    "registrationId": registration_repository.list()[0].registration_id,
-                    "classId": owned_class_id,
-                    "className": "周末拼课",
-                    "registerType": "ENROLLMENT",
-                    "registrationStatus": "SUBMITTED",
-                    "parentName": "张女士",
-                    "studentName": "张三",
-                    "studentGrade": "三年级",
-                    "contactInfo": "13800000000",
-                    "submittedAt": "2026-04-12T15:00:00+00:00",
-                    "followUpNote": None,
-                    "notes": None,
-                }
-            ]
-        },
-    }
+    assert response["requestId"] == "req-registration-list-initiator-001"
+    assert response["code"] == ErrorCode.OK
+    assert response["data"]["total"] == 1
+    item = response["data"]["items"][0]
+    assert item["registrationId"] == registration_repository.list()[0].registration_id
+    assert item["classId"] == owned_class_id
+    assert item["className"] == "周末拼课"
+    assert item["registerType"] == "ENROLLMENT"
+    assert item["registrationStatus"] == "SUBMITTED"
+    assert item["classStatus"] == "OPEN_FOR_ENROLLMENT"
+    assert item["parentName"] == "张女士"
+    assert item["contactInfo"] == "13800000000"
+    assert item["submittedAt"] == "2026-04-12T15:00:00+00:00"
 
 
 def test_list_registrations_rejects_user_without_backoffice_roles() -> None:

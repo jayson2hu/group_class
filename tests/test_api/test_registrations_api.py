@@ -254,7 +254,9 @@ def test_admin_registration_export_csv(client, approved_class_id, public_headers
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("text/csv")
     assert "attachment; filename=\"registrations_" in response.headers["content-disposition"]
-    assert "registrationId,classId,className,registerType,registrationStatus" in response.text
+    assert "registrationId,classId,className,registerType,registrationStatus,classStatus" in response.text
+    assert "englishLevel,currentStudents,maxStudents,waitlistCount,acceptSimilarRecommendation,remark" in response.text
+    assert "submittedAt,updatedAt,followUpNote,notes" in response.text
     assert "报名测试课" in response.text
 
 

@@ -627,7 +627,7 @@ export class ApiClient {
 
   async exportAdminRegistrations() {
     if (this.useMockData) {
-      const headers = ["registrationId", "classId", "className", "registerType", "registrationStatus", "parentName", "studentName", "studentGrade", "contactInfo", "submittedAt", "followUpNote", "notes"];
+      const headers = ["registrationId", "classId", "className", "registerType", "registrationStatus", "classStatus", "parentName", "studentName", "studentGrade", "contactInfo", "englishLevel", "currentStudents", "maxStudents", "waitlistCount", "acceptSimilarRecommendation", "remark", "submittedAt", "updatedAt", "followUpNote", "notes"];
       const rows = mockRegistrations.map((item) => headers.map((key) => `"${String(item[key] ?? "").replaceAll('"', '""')}"`).join(","));
       return `${headers.join(",")}\n${rows.join("\n")}\n`;
     }

@@ -496,6 +496,7 @@ uv run pytest tests/ -q
 | K7 | 创建课程表单分步化 | ✅ 已完成 | `node --check app.js/api.js`; `uv run pytest tests/ -q` 155 passed | `feat: split class creation form into steps` |
 | K8 | 驳回原因结构化 | ✅ 已完成 | `pytest classes api` 72 passed; `node --check app.js/api.js`; `uv run pytest tests/ -q` 155 passed | `feat: structure class rejection reasons` |
 | K9 | 运营看板 MVP | ✅ 已完成 | `pytest dashboard_api` 2 passed; `node --check app.js/api.js`; `uv run pytest tests/ -q` 157 passed | `feat: add admin operations dashboard` |
+| K10 | CSV 导出字段增强 | ✅ 已完成 | `pytest registrations` 41 passed; `node --check app.js/api.js`; `uv run pytest tests/ -q` 157 passed | `feat: expand registration csv export` |
 
 ---
 
@@ -618,6 +619,18 @@ uv run pytest tests/ -q
   - `/Users/fayun/.local/bin/uv run pytest tests/test_api/test_dashboard_api.py -q`（2 passed）
   - `/Users/fayun/.local/bin/uv run pytest tests/ -q`（157 passed）
 - Commit：`feat: add admin operations dashboard`
+
+### K10 完成记录（2026-05-14）
+
+- 报名 CSV 导出新增课程状态、英语基础、当前人数、最多人数、课程候补人数、相近课程推荐意向、家长备注、更新时间等字段。
+- 报名列表序列化同步补充导出所需字段，保持导出与后台可见数据一致。
+- 前端 mock CSV 导出表头同步更新。
+- 自测：
+  - `node --check apps/group_class_frontend/js/app.js`
+  - `node --check apps/group_class_frontend/js/api.js`
+  - `/Users/fayun/.local/bin/uv run pytest tests/group_class_backend/registrations/test_registration_commands.py tests/test_api/test_registrations_api.py -q`（41 passed）
+  - `/Users/fayun/.local/bin/uv run pytest tests/ -q`（157 passed）
+- Commit：`feat: expand registration csv export`
 
 ## 8. 验收口径
 
