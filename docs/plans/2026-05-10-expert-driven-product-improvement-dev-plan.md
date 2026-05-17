@@ -497,6 +497,7 @@ uv run pytest tests/ -q
 | K8 | 驳回原因结构化 | ✅ 已完成 | `pytest classes api` 72 passed; `node --check app.js/api.js`; `uv run pytest tests/ -q` 155 passed | `feat: structure class rejection reasons` |
 | K9 | 运营看板 MVP | ✅ 已完成 | `pytest dashboard_api` 2 passed; `node --check app.js/api.js`; `uv run pytest tests/ -q` 157 passed | `feat: add admin operations dashboard` |
 | K10 | CSV 导出字段增强 | ✅ 已完成 | `pytest registrations` 41 passed; `node --check app.js/api.js`; `uv run pytest tests/ -q` 157 passed | `feat: expand registration csv export` |
+| K11 | 相近课程自动推荐 | ✅ 已完成 | `pytest classes api` 73 passed; `node --check app.js/api.js`; `uv run pytest tests/ -q` 158 passed | `feat: recommend similar classes` |
 
 ---
 
@@ -631,6 +632,19 @@ uv run pytest tests/ -q
   - `/Users/fayun/.local/bin/uv run pytest tests/group_class_backend/registrations/test_registration_commands.py tests/test_api/test_registrations_api.py -q`（41 passed）
   - `/Users/fayun/.local/bin/uv run pytest tests/ -q`（157 passed）
 - Commit：`feat: expand registration csv export`
+
+### K11 完成记录（2026-05-14）
+
+- 公开课程详情新增 `similarClasses`，返回最多 3 个相近公开课程。
+- 推荐逻辑优先同课程类型、可报名课程，排除当前课程和非公开课程。
+- 报名成功页展示“可同时关注的相近课程”，用于候补和满员场景承接家长意向。
+- mock 公开详情同步返回相近课程。
+- 自测：
+  - `node --check apps/group_class_frontend/js/app.js`
+  - `node --check apps/group_class_frontend/js/api.js`
+  - `/Users/fayun/.local/bin/uv run pytest tests/group_class_backend/classes/test_class_queries_and_update.py tests/test_api/test_classes_api.py -q`（73 passed）
+  - `/Users/fayun/.local/bin/uv run pytest tests/ -q`（158 passed）
+- Commit：`feat: recommend similar classes`
 
 ## 8. 验收口径
 

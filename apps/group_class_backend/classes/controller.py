@@ -281,6 +281,22 @@ def _serialize_public_class(group_class: GroupClass) -> dict[str, object]:
     }
 
 
+def _similar_public_classes(repository: InMemoryClassRepository, current: GroupClass, limit: int = 3) -> list[dict[str, object]]:
+    candidates = [
+        item
+        for item in repository.list()
+        if item.class_id != current.class_id and item.status in _PUBLIC_VISIBLE_STATUSES
+    ]
+    candidates.sort(
+        key=lambda item: (
+            item.class_type != current.class_type,
+            item.status in {ClassStatus.FULL, ClassStatus.WAITLIST_OPEN},
+            item.updated_at,
+        )
+    )
+    return [_serialize_public_class(item) for item in candidates[:limit]]
+
+
 
 def _validation_error(request_id: str, message: str) -> dict[str, object]:
     field = "className" if "className or templateId" in message else message.split()[0]
@@ -814,6 +830,8 @@ def get_class_detail(
     if public_only and group_class.status not in _PUBLIC_VISIBLE_STATUSES:
         return _not_found_error(request_id)
     data = _serialize_public_class(group_class) if public_only else _serialize_class(group_class)
+    if public_only:
+        data["similarClasses"] = _similar_public_classes(repository, group_class)
     return success_response(request_id=request_id, data=data)
 
 

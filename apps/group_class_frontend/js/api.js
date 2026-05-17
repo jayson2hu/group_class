@@ -268,7 +268,12 @@ export class ApiClient {
 
   async getPublicClassDetail(classId) {
     if (this.useMockData) {
-      return mockClasses.find((item) => item.classId === classId) || null;
+      const detail = mockClasses.find((item) => item.classId === classId) || null;
+      if (!detail) return null;
+      return {
+        ...detail,
+        similarClasses: mockClasses.filter((item) => item.classId !== classId && item.status !== "DRAFT" && item.status !== "REJECTED").slice(0, 3),
+      };
     }
     const result = await requestJson(`${this.baseUrl}/api/v1/public/classes/${classId}`, {}, this.actorId, this.actorRoles);
     return result.data || result;

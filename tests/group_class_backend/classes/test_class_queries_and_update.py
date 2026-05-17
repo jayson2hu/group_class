@@ -1599,6 +1599,46 @@ def test_list_classes_public_only_returns_frontend_card_fields() -> None:
     assert item["waitlistCount"] == 2
 
 
+def test_public_class_detail_returns_similar_classes() -> None:
+    repository = InMemoryClassRepository()
+    current_id = _seed_class(repository)
+    current = repository.get(current_id)
+    assert current is not None
+    repository.update(replace(current, status=ClassStatus.FULL, class_type="ENGLISH"))
+    similar_response = create_class_draft(
+        payload={
+            "className": "相近阅读班",
+            "priceAmount": 399,
+            "minStudents": 4,
+            "maxStudents": 8,
+            "scheduleSummary": "每周六 10:00-11:30",
+            "targetAudience": "三至四年级学员",
+            "courseGoal": "提升阅读理解能力",
+            "groupRule": "满 4 人开班",
+        },
+        repository=repository,
+        audit_writer=NullAuditWriter(),
+        request_id="req-similar-create-001",
+        actor_id="initiator-001",
+        now=datetime(2026, 4, 12, 19, 0, tzinfo=timezone.utc),
+    )
+    similar = repository.get(similar_response["data"]["classId"])
+    assert similar is not None
+    repository.update(replace(similar, status=ClassStatus.OPEN_FOR_ENROLLMENT, class_type="ENGLISH"))
+
+    response = get_class_detail(
+        class_id=current_id,
+        repository=repository,
+        request_id="req-public-detail-similar-001",
+        public_only=True,
+    )
+
+    assert response["code"] == ErrorCode.OK
+    assert len(response["data"]["similarClasses"]) == 1
+    assert response["data"]["similarClasses"][0]["className"] == "相近阅读班"
+    assert response["data"]["similarClasses"][0]["primaryAction"] == "enroll"
+
+
 
 def test_get_class_detail_returns_not_found() -> None:
     repository = InMemoryClassRepository()

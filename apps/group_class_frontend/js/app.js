@@ -654,6 +654,15 @@ async function renderEnrollmentSuccess(result, classId) {
   const waitlistQueueHtml = registerType === "WAITLIST" && (result.waitlistPosition || result.waitlistCount)
     ? `<p><strong>候补位置：</strong>${result.waitlistPosition || "-"}${result.waitlistCount ? ` / 当前候补 ${result.waitlistCount} 人` : ""}</p>`
     : "";
+  const similarClasses = classDetail?.similarClasses || [];
+  const similarClassesHtml = similarClasses.length ? `
+    <section class="panel success-similar">
+      <h3>可同时关注的相近课程</h3>
+      <div class="success-similar-list">
+        ${similarClasses.map((item) => `<a class="success-similar-item" href="#/public/classes/${item.classId}"><strong>${item.className || "未命名课程"}</strong><span>${item.statusLabel || classStatusLabel(item.status)} · ${item.progressText || item.scheduleSummary || "查看课程详情"}</span></a>`).join("")}
+      </div>
+    </section>
+  ` : "";
   setHtml(`
     <section class="panel success-hero">
       <div class="success-icon" aria-hidden="true"></div>
@@ -668,6 +677,7 @@ async function renderEnrollmentSuccess(result, classId) {
       <h3>后续流程</h3>
       <div class="success-step-list">${successContent.steps.map(([title, text], index) => `<div class="success-step"><span>${index + 1}</span><div><strong>${title}</strong><p class="muted">${text}</p></div></div>`).join("")}</div>
     </section>
+    ${similarClassesHtml}
     <section class="panel success-actions"><div class="actions"><a class="btn primary" href="#/public/classes">返回看板</a><a class="btn" href="#/public/classes/${classId}">查看课程详情</a><button id="copy-class-link-btn" type="button" class="btn">复制课程链接</button></div></section>
   `);
   const copyButton = document.getElementById("copy-class-link-btn");
