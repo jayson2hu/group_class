@@ -499,6 +499,7 @@ uv run pytest tests/ -q
 | K10 | CSV 导出字段增强 | ✅ 已完成 | `pytest registrations` 41 passed; `node --check app.js/api.js`; `uv run pytest tests/ -q` 157 passed | `feat: expand registration csv export` |
 | K11 | 相近课程自动推荐 | ✅ 已完成 | `pytest classes api` 73 passed; `node --check app.js/api.js`; `uv run pytest tests/ -q` 158 passed | `feat: recommend similar classes` |
 | K12 | 报名截止自动关闭 | ✅ 已完成 | `pytest classes/registrations/api` 116 passed; `node --check app.js/api.js`; `uv run pytest tests/ -q` 160 passed | `feat: enforce signup deadlines` |
+| K13 | 自动通知接口预留 | ✅ 已完成 | `pytest dashboard_api` 4 passed; `uv run pytest tests/ -q` 162 passed | `feat: add notification preview endpoint` |
 
 ---
 
@@ -659,6 +660,17 @@ uv run pytest tests/ -q
   - `/Users/fayun/.local/bin/uv run pytest tests/group_class_backend/classes/test_class_queries_and_update.py tests/group_class_backend/registrations/test_registration_commands.py tests/test_api/test_classes_api.py tests/test_api/test_registrations_api.py -q`（116 passed）
   - `/Users/fayun/.local/bin/uv run pytest tests/ -q`（160 passed）
 - Commit：`feat: enforce signup deadlines`
+
+### K13 完成记录（2026-05-14）
+
+- 新增 `POST /api/v1/admin/notifications/preview` 通知预览接口。
+- 支持 `REGISTRATION_SUBMITTED`、`WAITLIST_PROMOTED`、`CLASS_APPROVED`、`CLASS_REJECTED` 场景模板。
+- 接口返回 `providerStatus=DRY_RUN`，只预留发送集成点，不调用外部短信/微信服务。
+- 补充权限校验和非法场景校验。
+- 自测：
+  - `/Users/fayun/.local/bin/uv run pytest tests/test_api/test_dashboard_api.py -q`（4 passed）
+  - `/Users/fayun/.local/bin/uv run pytest tests/ -q`（162 passed）
+- Commit：`feat: add notification preview endpoint`
 
 ## 8. 验收口径
 
