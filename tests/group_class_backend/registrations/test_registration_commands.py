@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 import sqlite3
 from dataclasses import replace
 
-from apps.group_class_backend.audit.interface import NullAuditWriter
+from apps.group_class_backend.audit.interface import InMemoryAuditLog, NullAuditWriter
 from apps.group_class_backend.classes.controller import create_class_draft
 from apps.group_class_backend.classes.repository import InMemoryClassRepository, SQLiteClassRepository
 from apps.group_class_backend.common.error_codes import ErrorCode
@@ -11,9 +11,9 @@ from apps.group_class_backend.persistence.schema import apply_schema
 from apps.group_class_backend.registrations.controller import (
     get_registration_detail,
     list_registrations,
+    promote_waitlist_registration,
     submit_registration,
     update_registration_notes,
-    update_registration_payment_status,
     update_registration_status,
 )
 
@@ -87,6 +87,86 @@ def test_submit_enrollment_registration_creates_record_and_updates_student_count
     assert persisted_class.waitlist_count == 0
 
 
+def test_submit_enrollment_auto_marks_almost_confirmed_at_sixty_percent() -> None:
+    class_repository = InMemoryClassRepository()
+    registration_repository = InMemoryRegistrationRepository()
+    response = create_class_draft(
+        payload={"className": "自动状态课", "minStudents": 3, "maxStudents": 6},
+        repository=class_repository,
+        audit_writer=NullAuditWriter(),
+        request_id="req-seed-auto-status-001",
+        actor_id="admin-001",
+        now=datetime(2026, 4, 12, 12, 0, tzinfo=timezone.utc),
+    )
+    class_id = response["data"]["classId"]
+    current = class_repository.get(class_id)
+    assert current is not None
+    class_repository.update(replace(current, status=ClassStatus.OPEN_FOR_ENROLLMENT, current_students=4))
+
+    result = submit_registration(
+        payload={
+            "classId": class_id,
+            "registerType": "ENROLLMENT",
+            "parentName": "张女士",
+            "contactInfo": "13800000000",
+            "studentName": "张三",
+            "studentGrade": "三年级",
+        },
+        class_repository=class_repository,
+        registration_repository=registration_repository,
+        audit_writer=NullAuditWriter(),
+        request_id="req-registration-auto-almost-001",
+        actor_id="parent-001",
+        now=datetime(2026, 4, 12, 15, 0, tzinfo=timezone.utc),
+    )
+
+    persisted = class_repository.get(class_id)
+    assert persisted is not None
+    assert persisted.current_students == 5
+    assert persisted.status == ClassStatus.ALMOST_CONFIRMED
+    assert result["data"]["classStatus"] == "ALMOST_CONFIRMED"
+
+
+def test_submit_enrollment_auto_marks_full_at_capacity() -> None:
+    class_repository = InMemoryClassRepository()
+    registration_repository = InMemoryRegistrationRepository()
+    response = create_class_draft(
+        payload={"className": "自动满员课", "minStudents": 3, "maxStudents": 6},
+        repository=class_repository,
+        audit_writer=NullAuditWriter(),
+        request_id="req-seed-auto-full-001",
+        actor_id="admin-001",
+        now=datetime(2026, 4, 12, 12, 0, tzinfo=timezone.utc),
+    )
+    class_id = response["data"]["classId"]
+    current = class_repository.get(class_id)
+    assert current is not None
+    class_repository.update(replace(current, status=ClassStatus.OPEN_FOR_ENROLLMENT, current_students=5))
+
+    result = submit_registration(
+        payload={
+            "classId": class_id,
+            "registerType": "ENROLLMENT",
+            "parentName": "李女士",
+            "contactInfo": "13900000000",
+            "studentName": "李四",
+            "studentGrade": "四年级",
+        },
+        class_repository=class_repository,
+        registration_repository=registration_repository,
+        audit_writer=NullAuditWriter(),
+        request_id="req-registration-auto-full-001",
+        actor_id="parent-002",
+        now=datetime(2026, 4, 12, 15, 0, tzinfo=timezone.utc),
+    )
+
+    persisted = class_repository.get(class_id)
+    assert persisted is not None
+    assert persisted.current_students == 6
+    assert persisted.status == ClassStatus.FULL
+    assert result["data"]["classStatus"] == "FULL"
+
+
 def test_submit_waitlist_registration_creates_record_and_updates_waitlist_count() -> None:
     class_repository = InMemoryClassRepository()
     registration_repository = InMemoryRegistrationRepository()
@@ -118,10 +198,54 @@ def test_submit_waitlist_registration_creates_record_and_updates_waitlist_count(
     assert response["code"] == ErrorCode.OK
     assert response["data"]["registerType"] == "WAITLIST"
     assert response["data"]["registrationStatus"] == "WAITLISTED"
+    assert response["data"]["waitlistCount"] == 1
+    assert response["data"]["waitlistPosition"] == 1
     assert persisted_registration.accept_similar_recommendation is True
     assert persisted_class is not None
     assert persisted_class.current_students == 0
     assert persisted_class.waitlist_count == 1
+
+
+def test_promote_waitlist_registration_updates_class_counts() -> None:
+    class_repository = InMemoryClassRepository()
+    registration_repository = InMemoryRegistrationRepository()
+    class_id = _seed_open_class(class_repository)
+    current = class_repository.get(class_id)
+    assert current is not None
+    class_repository.update(replace(current, status=ClassStatus.WAITLIST_OPEN))
+    waitlist = submit_registration(
+        payload={
+            "classId": class_id,
+            "registerType": "WAITLIST",
+            "parentName": "李女士",
+            "contactInfo": "13900000000",
+            "studentGrade": "四年级",
+        },
+        class_repository=class_repository,
+        registration_repository=registration_repository,
+        audit_writer=NullAuditWriter(),
+        request_id="req-registration-waitlist-promote-seed-001",
+        actor_id="parent-002",
+        now=datetime(2026, 4, 12, 15, 10, tzinfo=timezone.utc),
+    )["data"]
+
+    response = promote_waitlist_registration(
+        registration_id=waitlist["registrationId"],
+        class_repository=class_repository,
+        registration_repository=registration_repository,
+        audit_writer=NullAuditWriter(),
+        request_id="req-registration-waitlist-promote-001",
+        actor_id="admin-001",
+        actor_roles=["CLASS_ADMIN"],
+        now=datetime(2026, 4, 12, 16, 0, tzinfo=timezone.utc),
+    )
+
+    persisted_class = class_repository.get(class_id)
+    assert response["code"] == ErrorCode.OK
+    assert response["data"]["registrationStatus"] == "VALID"
+    assert persisted_class is not None
+    assert persisted_class.current_students == 1
+    assert persisted_class.waitlist_count == 0
 
 
 def test_submit_trial_registration_creates_record_without_incrementing_class_counts() -> None:
@@ -256,6 +380,38 @@ def test_submit_registration_rejects_waitlist_for_non_waitlist_status() -> None:
     }
 
 
+def test_submit_registration_rejects_after_signup_deadline() -> None:
+    class_repository = InMemoryClassRepository()
+    registration_repository = InMemoryRegistrationRepository()
+    class_id = _seed_open_class(class_repository)
+    current = class_repository.get(class_id)
+    assert current is not None
+    class_repository.update(replace(current, signup_deadline=datetime(2026, 4, 12, 14, 0, tzinfo=timezone.utc)))
+
+    response = submit_registration(
+        payload={
+            "classId": class_id,
+            "registerType": "ENROLLMENT",
+            "parentName": "张女士",
+            "contactInfo": "13800000000",
+            "studentName": "张三",
+            "studentGrade": "三年级",
+        },
+        class_repository=class_repository,
+        registration_repository=registration_repository,
+        audit_writer=NullAuditWriter(),
+        request_id="req-registration-expired-deadline-001",
+        actor_id="parent-001",
+        now=datetime(2026, 4, 12, 15, 0, tzinfo=timezone.utc),
+    )
+
+    assert response == {
+        "requestId": "req-registration-expired-deadline-001",
+        "code": ErrorCode.VALIDATION_INVALID_ARGUMENT,
+        "details": [{"field": "signupDeadline", "message": "class signup deadline has passed"}],
+    }
+
+
 def test_submit_registration_persists_sqlite_flow() -> None:
     connection = sqlite3.connect(":memory:")
     apply_schema(connection)
@@ -386,29 +542,19 @@ def test_list_registrations_returns_only_owned_class_records_for_initiator() -> 
         actor_roles=["INITIATOR"],
     )
 
-    assert response == {
-        "requestId": "req-registration-list-initiator-001",
-        "code": ErrorCode.OK,
-        "data": {
-            "items": [
-                {
-                    "registrationId": registration_repository.list()[0].registration_id,
-                    "classId": owned_class_id,
-                    "className": "周末拼课",
-                    "registerType": "ENROLLMENT",
-                    "registrationStatus": "SUBMITTED",
-                    "parentName": "张女士",
-                    "studentName": "张三",
-                    "studentGrade": "三年级",
-                    "contactInfo": "13800000000",
-                        "submittedAt": "2026-04-12T15:00:00+00:00",
-                        "paymentStatus": "UNPAID",
-                        "followUpNote": None,
-                    "notes": None,
-                }
-            ]
-        },
-    }
+    assert response["requestId"] == "req-registration-list-initiator-001"
+    assert response["code"] == ErrorCode.OK
+    assert response["data"]["total"] == 1
+    item = response["data"]["items"][0]
+    assert item["registrationId"] == registration_repository.list()[0].registration_id
+    assert item["classId"] == owned_class_id
+    assert item["className"] == "周末拼课"
+    assert item["registerType"] == "ENROLLMENT"
+    assert item["registrationStatus"] == "SUBMITTED"
+    assert item["classStatus"] == "OPEN_FOR_ENROLLMENT"
+    assert item["parentName"] == "张女士"
+    assert item["contactInfo"] == "13800000000"
+    assert item["submittedAt"] == "2026-04-12T15:00:00+00:00"
 
 
 def test_list_registrations_rejects_user_without_backoffice_roles() -> None:
@@ -504,6 +650,7 @@ def test_list_registrations_persists_sqlite_filtering_for_initiator() -> None:
 def test_get_registration_detail_and_update_notes_for_owned_class_initiator() -> None:
     class_repository = InMemoryClassRepository()
     registration_repository = InMemoryRegistrationRepository()
+    audit_log = InMemoryAuditLog()
     class_id = _seed_open_class(class_repository)
 
     submit_registration(
@@ -518,7 +665,7 @@ def test_get_registration_detail_and_update_notes_for_owned_class_initiator() ->
         },
         class_repository=class_repository,
         registration_repository=registration_repository,
-        audit_writer=NullAuditWriter(),
+        audit_writer=audit_log,
         request_id="req-registration-detail-seed-001",
         actor_id="parent-001",
         now=datetime(2026, 4, 12, 15, 0, tzinfo=timezone.utc),
@@ -530,6 +677,7 @@ def test_get_registration_detail_and_update_notes_for_owned_class_initiator() ->
         payload={"followUpNote": "已电话联系，待确认试课时间", "notes": "家长偏好周末上午"},
         class_repository=class_repository,
         registration_repository=registration_repository,
+        audit_writer=audit_log,
         request_id="req-registration-note-update-001",
         actor_id="admin-001",
         actor_roles=["INITIATOR"],
@@ -542,6 +690,7 @@ def test_get_registration_detail_and_update_notes_for_owned_class_initiator() ->
         request_id="req-registration-detail-001",
         actor_id="admin-001",
         actor_roles=["INITIATOR"],
+        audit_reader=audit_log,
     )
 
     assert update_response["code"] == ErrorCode.OK
@@ -565,7 +714,30 @@ def test_get_registration_detail_and_update_notes_for_owned_class_initiator() ->
             "notes": "家长偏好周末上午",
             "submittedAt": "2026-04-12T15:00:00+00:00",
             "updatedAt": "2026-04-12T16:00:00+00:00",
-            "paymentStatus": "UNPAID",
+            "operationHistory": [
+                {
+                    "requestId": "req-registration-detail-seed-001",
+                    "actorId": "parent-001",
+                    "action": "registration.submitted",
+                    "occurredAt": detail_response["data"]["operationHistory"][0]["occurredAt"],
+                    "metadata": {
+                        "classId": class_id,
+                        "registerType": "ENROLLMENT",
+                        "registrationStatus": "SUBMITTED",
+                    },
+                },
+                {
+                    "requestId": "req-registration-note-update-001",
+                    "actorId": "admin-001",
+                    "action": "registration.notes_updated",
+                    "occurredAt": detail_response["data"]["operationHistory"][1]["occurredAt"],
+                    "metadata": {
+                        "classId": class_id,
+                        "hasFollowUpNote": True,
+                        "hasNotes": True,
+                    },
+                },
+            ],
         },
     }
 
@@ -659,44 +831,6 @@ def test_update_registration_status_marks_owned_class_registration_valid_and_pre
     assert persisted_class is not None
     assert persisted_class.current_students == 1
     assert persisted_class.waitlist_count == 0
-
-
-def test_update_registration_payment_status_marks_registration_paid() -> None:
-    class_repository = InMemoryClassRepository()
-    registration_repository = InMemoryRegistrationRepository()
-    class_id = _seed_open_class(class_repository)
-
-    submit_registration(
-        payload={
-            "classId": class_id,
-            "registerType": "ENROLLMENT",
-            "parentName": "张女士",
-            "contactInfo": "13800000000",
-            "studentName": "张三",
-            "studentGrade": "三年级",
-        },
-        class_repository=class_repository,
-        registration_repository=registration_repository,
-        audit_writer=NullAuditWriter(),
-        request_id="req-registration-payment-seed-001",
-        actor_id="parent-001",
-        now=datetime(2026, 4, 12, 15, 0, tzinfo=timezone.utc),
-    )
-    registration_id = registration_repository.list()[0].registration_id
-
-    response = update_registration_payment_status(
-        registration_id=registration_id,
-        payload={"paymentStatus": "PAID"},
-        class_repository=class_repository,
-        registration_repository=registration_repository,
-        request_id="req-registration-payment-update-001",
-        actor_id="admin-001",
-        actor_roles=["CLASS_ADMIN"],
-        now=datetime(2026, 4, 12, 16, 0, tzinfo=timezone.utc),
-    )
-
-    assert response["code"] == ErrorCode.OK
-    assert response["data"]["paymentStatus"] == "PAID"
 
 
 def test_update_registration_status_rejects_unowned_initiator() -> None:
@@ -866,6 +1000,7 @@ def test_update_registration_status_persists_in_sqlite() -> None:
         payload={"followUpNote": "已加入回访清单", "notes": "家长询问教材版本"},
         class_repository=class_repository,
         registration_repository=registration_repository,
+        audit_writer=NullAuditWriter(),
         request_id="req-registration-note-update-sqlite-001",
         actor_id="super-admin-001",
         actor_roles=["SUPER_ADMIN"],

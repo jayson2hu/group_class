@@ -24,6 +24,7 @@ class Action(StrEnum):
     APPROVE = "approve"
     REJECT = "reject"
     PUBLISH = "publish"
+    CANCEL = "cancel"
 
 
 _DEFAULT_ACTIONS_BY_STATUS: dict[ClassStatus, list[Action]] = {
@@ -39,6 +40,30 @@ _DEFAULT_ACTIONS_BY_STATUS: dict[ClassStatus, list[Action]] = {
         Action.VIEW,
         Action.EDIT,
         Action.SUBMIT_REVIEW,
+    ],
+    ClassStatus.OPEN_FOR_ENROLLMENT: [
+        Action.VIEW,
+        Action.CANCEL,
+    ],
+    ClassStatus.ALMOST_CONFIRMED: [
+        Action.VIEW,
+        Action.CANCEL,
+    ],
+    ClassStatus.CONFIRMED: [
+        Action.VIEW,
+        Action.CANCEL,
+    ],
+    ClassStatus.FULL: [
+        Action.VIEW,
+        Action.CANCEL,
+    ],
+    ClassStatus.WAITLIST_OPEN: [
+        Action.VIEW,
+        Action.CANCEL,
+    ],
+    ClassStatus.IN_PROGRESS: [
+        Action.VIEW,
+        Action.CANCEL,
     ],
 }
 

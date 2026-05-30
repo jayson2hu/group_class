@@ -5,8 +5,10 @@ const apiBaseUrl = window.localStorage.getItem("GROUP_CLASS_API_BASE_URL") || de
 const api = new ApiClient(apiBaseUrl);
 const app = document.getElementById("app");
 
+const ROLE_KEY = "GROUP_CLASS_ROLE";
 const ACTOR_ID_KEY = "GROUP_CLASS_ACTOR_ID";
 const ACTOR_ROLES_KEY = "GROUP_CLASS_ACTOR_ROLES";
+const LIST_PAGE_SIZE = 20;
 
 function showToast(message, type = "info") {
   const safeType = ["success", "error", "info"].includes(type) ? type : "info";
@@ -18,7 +20,7 @@ function showToast(message, type = "info") {
   }
   const toast = document.createElement("div");
   toast.className = `toast toast-${safeType} toast-enter`;
-  toast.innerHTML = `<div class="toast-content">${message}</div><button class="toast-close" type="button" aria-label="关闭">×</button>`;
+  toast.innerHTML = `<div class="toast-content">${message}</div><button class="toast-close" type="button">×</button>`;
   const removeToast = () => {
     toast.classList.remove("toast-enter");
     toast.classList.add("toast-exit");
@@ -30,14 +32,6 @@ function showToast(message, type = "info") {
 }
 
 window.showToast = showToast;
-
-function escapeHtml(value) {
-  return String(value ?? "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-}
 
 function emptyStateHtml(title, description) {
   return `
@@ -54,28 +48,24 @@ function errorStateHtml(message, backHash = "#/public/classes") {
     <section class="panel unified-state unified-error">
       <div class="state-icon" aria-hidden="true">!</div>
       <h3>页面加载失败</h3>
-      <p class="error">${escapeHtml(message || "发生未知错误")}</p>
+      <p class="error">${message || "发生未知错误"}</p>
       <a class="btn" href="${backHash}">返回</a>
     </section>
   `;
 }
 
-function isLoggedIn() {
-  return Boolean(api.getToken());
+function isAdminMode() {
+  return window.localStorage.getItem(ROLE_KEY) === "admin";
 }
 
-function persistActorContext(actorId, actorRoles) {
-  if (!actorId) return;
-  window.localStorage.setItem(ACTOR_ID_KEY, actorId);
-  window.localStorage.setItem(ACTOR_ROLES_KEY, (actorRoles || []).join(","));
+function syncAdminIdentityDefaults() {
+  if (!isAdminMode()) return;
+  if (!window.localStorage.getItem(ACTOR_ID_KEY)) window.localStorage.setItem(ACTOR_ID_KEY, "u_demo_creator");
+  if (!window.localStorage.getItem(ACTOR_ROLES_KEY)) window.localStorage.setItem(ACTOR_ROLES_KEY, "CLASS_ADMIN");
 }
 
 function getActorContext() {
-  const authUser = api.getAuthUser();
-  if (authUser?.actorId) {
-    return { actorId: authUser.actorId, actorRoles: authUser.actorRoles || ["CLASS_ADMIN"] };
-  }
-  const actorId = window.localStorage.getItem(ACTOR_ID_KEY) || "u_admin";
+  const actorId = window.localStorage.getItem(ACTOR_ID_KEY) || "u_demo_creator";
   const actorRoles = (window.localStorage.getItem(ACTOR_ROLES_KEY) || "CLASS_ADMIN")
     .split(",")
     .map((role) => role.trim())
@@ -84,12 +74,23 @@ function getActorContext() {
 }
 
 function syncAdminNav() {
-  const loginEntry = document.getElementById("login-entry");
-  const accountEntry = document.getElementById("account-entry");
-  const inLoginPage = (window.location.hash || "").startsWith("#/login");
-  const loggedIn = isLoggedIn();
-  if (loginEntry) loginEntry.style.display = loggedIn ? "none" : "";
-  if (accountEntry) accountEntry.style.display = loggedIn && !inLoginPage ? "" : "none";
+  const adminNav = document.getElementById("admin-nav");
+  const toggleBtn = document.getElementById("role-toggle");
+  if (adminNav) adminNav.style.display = isAdminMode() ? "" : "none";
+  if (toggleBtn) toggleBtn.textContent = isAdminMode() ? "切换为家长" : "切换为管理员";
+}
+
+function toggleAdminMode() {
+  const current = isAdminMode();
+  window.localStorage.setItem(ROLE_KEY, current ? "public" : "admin");
+  syncAdminIdentityDefaults();
+  api.refreshActor();
+  syncAdminNav();
+  showToast(current ? "已切换为家长模式" : "已切换为管理员模式", "info");
+  if (current && window.location.hash.startsWith("#/admin")) {
+    window.location.hash = "#/public/classes";
+  }
+  renderRoute();
 }
 
 function syncNavState() {
@@ -105,101 +106,6 @@ function syncNavState() {
   });
 }
 
-async function renderMyRegistrations() {
-  const result = await api.getMyRegistrations();
-  const items = result.items || [];
-  if (!items.length) {
-    setHtml(`
-      <section class="panel admin-hero">
-        <div><p class="section-kicker">My Registrations</p><h2>我的报名</h2><p class="muted admin-hero-text">登录后可查看历史拼课、待拼课和待开课记录。</p></div>
-      </section>
-      ${emptyStateHtml("暂无报名记录", "你还没有提交过报名、候补或试听申请。")}
-    `);
-    return;
-  }
-  const summary = { ENROLLMENT: 0, WAITLIST: 0, TRIAL: 0 };
-  items.forEach((item) => { if (summary[item.registerType] !== undefined) summary[item.registerType] += 1; });
-  const cards = items.map((item) => `
-    <article class="panel registration-card" data-registration-id="${escapeHtml(item.registrationId)}">
-      <div class="registration-card-head"><h3>${escapeHtml(item.className || "未命名课程")}</h3><div class="registration-card-chips">${registrationTypeChip(item.registerType)}${statusChip(item.registrationStatus, item.registrationStatus)}</div></div>
-      <dl class="registration-card-info">
-        <div><dt>学员</dt><dd>${escapeHtml(item.studentName || "-")}</dd></div>
-        <div><dt>年级</dt><dd>${escapeHtml(item.studentGrade || "-")}</dd></div>
-        <div><dt>家长</dt><dd>${escapeHtml(item.parentName || "-")}</dd></div>
-        <div><dt>缴费状态</dt><dd>${escapeHtml(paymentStatusLabel(item.paymentStatus))}</dd></div>
-        <div><dt>提交时间</dt><dd>${escapeHtml(item.submittedAt || "-")}</dd></div>
-      </dl>
-      <div class="actions">
-        <button type="button" class="btn" data-action="edit-registration" data-registration-id="${escapeHtml(item.registrationId)}">修改资料</button>
-        <button type="button" class="btn" data-action="cancel-registration" data-registration-id="${escapeHtml(item.registrationId)}" ${item.registrationStatus === "CANCELLED" ? "disabled" : ""}>取消报名</button>
-      </div>
-    </article>
-  `).join("");
-  setHtml(`
-    <section class="panel admin-hero">
-      <div><p class="section-kicker">My Registrations</p><h2>我的报名</h2><p class="muted admin-hero-text">查看你参与过的拼课、候补和试听申请。</p></div>
-      <div class="admin-summary-grid registration-summary-grid">
-        <div class="summary-pill"><span class="summary-label">全部记录</span><strong class="summary-value">${items.length}</strong></div>
-        <div class="summary-pill"><span class="summary-label">报名</span><strong class="summary-value">${summary.ENROLLMENT}</strong></div>
-        <div class="summary-pill"><span class="summary-label">候补</span><strong class="summary-value">${summary.WAITLIST}</strong></div>
-        <div class="summary-pill"><span class="summary-label">试听</span><strong class="summary-value">${summary.TRIAL}</strong></div>
-      </div>
-    </section>
-    <section class="grid registration-card-grid">${cards}</section>
-  `);
-  bindMyRegistrationActions(items);
-}
-
-function bindMyRegistrationActions(items) {
-  const byId = new Map(items.map((item) => [item.registrationId, item]));
-  document.querySelectorAll("[data-action='cancel-registration']").forEach((button) => {
-    button.addEventListener("click", async () => {
-      const registrationId = button.getAttribute("data-registration-id");
-      if (!registrationId || !window.confirm("确认取消这条报名记录？")) return;
-      const restore = setButtonLoading(button, "取消中...");
-      try {
-        await api.cancelMyRegistration(registrationId);
-        showToast("报名已取消", "success");
-        await renderMyRegistrations();
-      } catch (error) {
-        showToast(error.message || "取消失败", "error");
-        restore();
-      }
-    });
-  });
-  document.querySelectorAll("[data-action='edit-registration']").forEach((button) => {
-    button.addEventListener("click", async () => {
-      const registrationId = button.getAttribute("data-registration-id");
-      const current = registrationId ? byId.get(registrationId) : null;
-      if (!registrationId || !current) return;
-      const parentName = window.prompt("家长姓名", current.parentName || "");
-      if (parentName === null) return;
-      const studentName = window.prompt("学员姓名", current.studentName || "");
-      if (studentName === null) return;
-      const studentGrade = window.prompt("学员年级", current.studentGrade || "");
-      if (studentGrade === null) return;
-      const restore = setButtonLoading(button, "保存中...");
-      try {
-        await api.updateMyRegistration(registrationId, { parentName, studentName, studentGrade });
-        showToast("报名资料已更新", "success");
-        await renderMyRegistrations();
-      } catch (error) {
-        showToast(error.message || "保存失败", "error");
-        restore();
-      }
-    });
-  });
-}
-
-function navigateTo(hash) {
-  if (!hash) return;
-  if (window.location.hash === hash) {
-    renderRoute();
-    return;
-  }
-  window.location.hash = hash;
-}
-
 function setHtml(content) {
   app.innerHTML = content;
   syncAdminNav();
@@ -211,7 +117,7 @@ function loadingHtml() {
     <section class="panel loading-panel">
       <p class="section-kicker">Loading</p>
       <h2>页面加载中</h2>
-      <p class="muted">正在获取最新数据，请稍候。</p>
+      <p class="muted">正在拉取最新数据，请稍候。</p>
     </section>
   `;
 }
@@ -223,7 +129,23 @@ function getHashParts() {
 }
 
 function statusChip(status, label) {
-  return `<span class="chip ${escapeHtml(status)}">${escapeHtml(label || status || "-")}</span>`;
+  return `<span class="chip ${status}">${label || status}</span>`;
+}
+
+function classStatusLabel(status) {
+  const mapping = {
+    DRAFT: "草稿",
+    PENDING_REVIEW: "待审核",
+    REJECTED: "已驳回",
+    OPEN_FOR_ENROLLMENT: "报名中",
+    ALMOST_CONFIRMED: "即将成班",
+    CONFIRMED: "已成班",
+    FULL: "已满员",
+    WAITLIST_OPEN: "候补开放",
+    IN_PROGRESS: "进行中",
+    CANCELLED: "已取消",
+  };
+  return mapping[status] || status || "-";
 }
 
 function registrationTypeLabel(type) {
@@ -232,16 +154,17 @@ function registrationTypeLabel(type) {
 }
 
 function registrationTypeChip(type) {
-  return `<span class="chip ${escapeHtml(type)}">${escapeHtml(registrationTypeLabel(type))}</span>`;
-}
-
-function paymentStatusLabel(status) {
-  const mapping = { UNPAID: "未缴费", PAID: "已缴费", PENDING_CONFIRMATION: "待确认", REFUNDED: "已退款" };
-  return mapping[status] || status || "-";
+  return `<span class="chip ${type}">${registrationTypeLabel(type)}</span>`;
 }
 
 function formatDateRange(startDate, endDate) {
   return `${startDate || "-"} ~ ${endDate || "-"}`;
+}
+
+function firstLineSummary(value, maxLength = 34) {
+  const text = String(value || "").split(/\r?\n/).map((line) => line.trim()).find(Boolean) || "";
+  if (!text) return "";
+  return text.length > maxLength ? `${text.slice(0, maxLength)}...` : text;
 }
 
 function parseIntOrNull(value) {
@@ -249,6 +172,155 @@ function parseIntOrNull(value) {
   if (!text) return null;
   const parsed = Number(text);
   return Number.isFinite(parsed) ? parsed : null;
+}
+
+function readPage(queryParams) {
+  const page = Number(queryParams?.get("page") || "1");
+  return Number.isFinite(page) && page > 0 ? Math.floor(page) : 1;
+}
+
+function readClassFilters(queryParams) {
+  return {
+    status: queryParams.getAll("status").flatMap((value) => value.split(",").map((entry) => entry.trim()).filter(Boolean)),
+    creatorId: queryParams.get("creatorId") || "",
+    keyword: queryParams.get("keyword") || "",
+  };
+}
+
+function classFilterHtml(filters) {
+  const statuses = ["DRAFT", "PENDING_REVIEW", "REJECTED", "OPEN_FOR_ENROLLMENT", "ALMOST_CONFIRMED", "CONFIRMED", "FULL", "WAITLIST_OPEN", "IN_PROGRESS", "CANCELLED"];
+  return `
+    <form id="admin-class-filter-form" class="panel filter-bar">
+      <div class="row"><label>状态</label><select name="status"><option value="">全部状态</option>${statuses.map((status) => `<option value="${status}" ${filters.status.includes(status) ? "selected" : ""}>${classStatusLabel(status)}</option>`).join("")}</select></div>
+      <div class="row"><label>关键词</label><input name="keyword" value="${filters.keyword}" placeholder="按课程名称搜索" /></div>
+      <div class="row"><label>发起人 ID</label><input name="creatorId" value="${filters.creatorId}" placeholder="可选" /></div>
+      <div class="actions filter-actions"><button type="submit" class="primary">筛选</button><a class="btn" href="#/admin/classes">重置</a></div>
+    </form>
+  `;
+}
+
+function paginationHtml(baseHash, page, pageSize, total) {
+  const totalPages = Math.max(1, Math.ceil((total || 0) / pageSize));
+  if (totalPages <= 1) return "";
+  const separator = baseHash.includes("?") ? "&" : "?";
+  const prev = page > 1 ? `<a class="btn pagination-btn" href="${baseHash}${separator}page=${page - 1}">&lt; 上一页</a>` : '<span class="pagination-spacer"></span>';
+  const next = page < totalPages ? `<a class="btn pagination-btn" href="${baseHash}${separator}page=${page + 1}">下一页 &gt;</a>` : '<span class="pagination-spacer"></span>';
+  return `
+    <nav class="pagination-bar" aria-label="分页">
+      ${prev}
+      <span class="pagination-status">第 ${page} / ${totalPages} 页，共 ${total} 条</span>
+      ${next}
+    </nav>
+  `;
+}
+
+function bindAdminClassFilters() {
+  const form = document.getElementById("admin-class-filter-form");
+  if (!form) return;
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const fd = new FormData(form);
+    const params = new URLSearchParams();
+    const status = String(fd.get("status") || "").trim();
+    const keyword = String(fd.get("keyword") || "").trim();
+    const creatorId = String(fd.get("creatorId") || "").trim();
+    if (status) params.set("status", status);
+    if (keyword) params.set("keyword", keyword);
+    if (creatorId) params.set("creatorId", creatorId);
+    window.location.hash = params.toString() ? `#/admin/classes?${params.toString()}` : "#/admin/classes";
+  });
+}
+
+function readRegistrationFilters(queryParams) {
+  return {
+    registerType: queryParams.get("registerType") || "",
+    registrationStatus: queryParams.get("registrationStatus") || "",
+    keyword: queryParams.get("keyword") || "",
+  };
+}
+
+function registrationStatusLabel(status) {
+  const mapping = {
+    SUBMITTED: "待确认",
+    VALID: "有效",
+    INVALID: "无效",
+    WAITLISTED: "候补中",
+    CANCELLED: "已取消",
+  };
+  return mapping[status] || status || "-";
+}
+
+function formatRate(value) {
+  const numeric = Number(value || 0);
+  return `${Math.round(numeric * 100)}%`;
+}
+
+function operationActionLabel(action) {
+  const mapping = {
+    "registration.submitted": "提交报名",
+    "registration.notes_updated": "更新备注",
+    "registration.status_updated": "更新状态",
+    "registration.waitlist_promoted": "候补转正",
+  };
+  return mapping[action] || action || "-";
+}
+
+function operationHistoryHtml(history = []) {
+  if (!history.length) {
+    return '<p class="muted">暂无操作记录。</p>';
+  }
+  return `
+    <div class="operation-timeline">
+      ${history.map((item) => `
+        <div class="operation-item">
+          <span class="operation-dot" aria-hidden="true"></span>
+          <div>
+            <strong>${operationActionLabel(item.action)}</strong>
+            <p class="muted">${item.occurredAt || "-"} · ${item.actorId || "-"}</p>
+          </div>
+        </div>
+      `).join("")}
+    </div>
+  `;
+}
+
+function promptRejectReason() {
+  const reasonText = window.prompt("请输入驳回原因，便于发起人修改课程。", "课程信息需要补充完善");
+  if (reasonText === null) return null;
+  return {
+    reasonCode: "CONTENT_INCOMPLETE",
+    reasonText: reasonText.trim(),
+  };
+}
+
+function registrationFilterHtml(filters) {
+  const types = ["ENROLLMENT", "WAITLIST", "TRIAL"];
+  const statuses = ["SUBMITTED", "VALID", "WAITLISTED", "INVALID", "CANCELLED"];
+  return `
+    <form id="admin-registration-filter-form" class="panel filter-bar registration-filter-bar">
+      <div class="row"><label>报名类型</label><select name="registerType"><option value="">全部类型</option>${types.map((type) => `<option value="${type}" ${filters.registerType === type ? "selected" : ""}>${registrationTypeLabel(type)}</option>`).join("")}</select></div>
+      <div class="row"><label>报名状态</label><select name="registrationStatus"><option value="">全部状态</option>${statuses.map((status) => `<option value="${status}" ${filters.registrationStatus === status ? "selected" : ""}>${registrationStatusLabel(status)}</option>`).join("")}</select></div>
+      <div class="row"><label>关键词</label><input name="keyword" value="${filters.keyword}" placeholder="家长 / 学员 / 课程" /></div>
+      <div class="actions filter-actions"><button type="submit" class="primary">筛选</button><a class="btn" href="#/admin/registrations">重置</a></div>
+    </form>
+  `;
+}
+
+function bindAdminRegistrationFilters() {
+  const form = document.getElementById("admin-registration-filter-form");
+  if (!form) return;
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const fd = new FormData(form);
+    const params = new URLSearchParams();
+    const registerType = String(fd.get("registerType") || "").trim();
+    const registrationStatus = String(fd.get("registrationStatus") || "").trim();
+    const keyword = String(fd.get("keyword") || "").trim();
+    if (registerType) params.set("registerType", registerType);
+    if (registrationStatus) params.set("registrationStatus", registrationStatus);
+    if (keyword) params.set("keyword", keyword);
+    window.location.hash = params.toString() ? `#/admin/registrations?${params.toString()}` : "#/admin/registrations";
+  });
 }
 
 function parseIsoOrNull(value) {
@@ -267,24 +339,37 @@ function setButtonLoading(button, text) {
   };
 }
 
-function actionLabel(action) {
-  const mapping = { view: "查看", edit: "编辑", submit_review: "提交审核", approve: "审核通过", reject: "驳回", enroll: "报名", trial: "试听", join_waitlist: "候补" };
-  return mapping[action] || action;
+async function copyText(text) {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(text);
+    return true;
+  }
+  const input = document.createElement("input");
+  input.value = text;
+  input.setAttribute("readonly", "readonly");
+  input.className = "sr-only-copy-input";
+  document.body.appendChild(input);
+  input.select();
+  const copied = document.execCommand("copy");
+  input.remove();
+  return copied;
 }
 
 function actionTag(action, classId) {
-  if (["submit_review", "approve", "reject"].includes(action)) {
-    return `<button type="button" class="action-tag action-tag-button" data-class-id="${escapeHtml(classId)}" data-action="${escapeHtml(action)}">${actionLabel(action)}</button>`;
+  if (["submit_review", "approve", "reject", "cancel"].includes(action)) {
+    const extraClass = action === "cancel" ? " action-tag-danger" : "";
+    return `<button type="button" class="action-tag action-tag-button${extraClass}" data-class-id="${classId}" data-action="${action}">${action}</button>`;
   }
-  return `<span class="action-tag">${actionLabel(action)}</span>`;
+  return `<span class="action-tag">${action}</span>`;
 }
 
 function publicFaqHtml() {
   const faqItems = [
-    ["什么情况算成班？", "达到最低成班人数后即可成班，具体人数以课程详情为准。"],
+    ["什么情况下成班？", "达到最低成班人数即成班，具体人数见各课程详情。"],
     ["不成班怎么办？", "运营会统一通知转班或退款安排。"],
-    ["可以试听吗？", "部分课程支持试听，是否可试听以课程详情和运营确认为准。"],
-    ["缺课怎么办？", "每个课程有不同缺课规则，报名前请查看课程详情。"],
+    ["可以试听吗？", "部分课程支持试听，详见课程详情页。"],
+    ["缺课怎么办？", "各课程有不同缺课规则，报名前请查看详情。"],
+    ["是否支持换班？", "部分课程支持调班，具体请咨询运营。"],
   ];
   return `
     <section class="panel public-faq-panel">
@@ -294,18 +379,21 @@ function publicFaqHtml() {
   `;
 }
 
-async function renderPublicList() {
-  const classes = await api.getPublicClasses();
+async function renderPublicList(queryParams = new URLSearchParams()) {
+  const page = readPage(queryParams);
+  const result = await api.getPublicClasses(page, LIST_PAGE_SIZE);
+  const classes = result.items || [];
+  const total = result.total ?? classes.length;
   if (!classes.length) {
     setHtml(`
       <section class="panel list-hero">
         <div>
           <p class="section-kicker">Public Enrollment Board</p>
           <h2>英语拼课报名看板</h2>
-          <p class="muted list-hero-text">统一查看课程并提交报名，不再依赖群内接龙。</p>
+          <p class="muted list-hero-text">统一报名入口，不再群内接龙。</p>
         </div>
       </section>
-      ${emptyStateHtml("暂无课程", "当前没有正在开放报名的课程。")}
+      ${emptyStateHtml("暂无课程", "当前暂无可展示课程，稍后刷新再试。")}
       ${publicFaqHtml()}
     `);
     return;
@@ -319,30 +407,37 @@ async function renderPublicList() {
     const currentStudents = item.currentStudents ?? 0;
     const maxStudents = item.maxStudents ?? "-";
     const remainingSeats = item.remainingSeats ?? (typeof item.maxStudents === "number" ? Math.max(item.maxStudents - currentStudents, 0) : null);
+    const audienceSummary = firstLineSummary(item.targetAudience);
+    const highlightSummary = firstLineSummary(item.highlights);
+    const decisionTags = [
+      audienceSummary ? ["适合", audienceSummary] : null,
+      highlightSummary ? ["亮点", highlightSummary] : null,
+    ].filter(Boolean);
     return `
       <article class="panel class-card">
         <div class="class-card-head">
           <div>
-            <p class="class-card-kicker">课程</p>
-            <h3>${escapeHtml(item.className)}</h3>
-            <p class="muted class-card-subtitle">${escapeHtml(item.courseSubtitle || "查看课程详情了解更多信息")}</p>
+            <p class="class-card-kicker">拼课招募中</p>
+            <h3>${item.className}</h3>
+            <p class="muted class-card-subtitle">${item.courseSubtitle || "按真实后端课程状态同步展示当前班级信息"}</p>
           </div>
           ${statusChip(item.status, item.statusLabel)}
         </div>
-        <p class="class-card-progress">${escapeHtml(item.progressText || "正在开放报名")}</p>
+        <p class="class-card-progress">${item.progressText || "支持报名、候补与状态联动更新"}</p>
+        ${decisionTags.length ? `<div class="class-card-decision-tags">${decisionTags.map(([label, text]) => `<div class="decision-tag"><span>${label}</span><strong>${text}</strong></div>`).join("")}</div>` : ""}
         <div class="class-card-metrics">
           <div class="metric-tile metric-tile-accent"><span class="metric-label">剩余名额</span><strong class="metric-value">${remainingSeats ?? "-"}</strong></div>
           <div class="metric-tile"><span class="metric-label">课程价格</span><strong class="metric-value">¥${item.priceAmount ?? "-"}</strong></div>
           <div class="metric-tile"><span class="metric-label">当前人数</span><strong class="metric-value">${currentStudents}/${maxStudents}</strong></div>
         </div>
         <dl class="class-card-facts">
-          <div><dt>上课安排</dt><dd>${escapeHtml(item.scheduleSummary || "待确认")}</dd></div>
-          <div><dt>课程日期</dt><dd>${formatDateRange(item.startDate, item.endDate)}</dd></div>
-          <div><dt>成班规则</dt><dd>${item.minStudents ?? "-"} 人起，最多 ${maxStudents} 人</dd></div>
+          <div><dt>上课时间</dt><dd>${item.scheduleSummary || "待教务确认"}</dd></div>
+          <div><dt>开课周期</dt><dd>${formatDateRange(item.startDate, item.endDate)}</dd></div>
+          <div><dt>成班门槛</dt><dd>${item.minStudents ?? "-"} 人开班，最多 ${maxStudents} 人</dd></div>
         </dl>
         <div class="actions class-card-actions">
           <a class="btn" href="#/public/classes/${id}">查看详情</a>
-          <a class="btn primary" href="#/public/enroll/${id}?type=${primaryType}">${escapeHtml(primaryLabel)}</a>
+          <a class="btn primary" href="#/public/enroll/${id}?type=${primaryType}">${primaryLabel}</a>
         </div>
       </article>
     `;
@@ -353,14 +448,15 @@ async function renderPublicList() {
       <div>
         <p class="section-kicker">Public Enrollment Board</p>
         <h2>英语拼课报名看板</h2>
-        <p class="muted list-hero-text">统一查看课程状态、名额和规则，直接提交报名或候补申请。</p>
+        <p class="muted list-hero-text">统一报名入口，不再群内接龙。家长可先查看课程状态，再进入详情或直接提交报名。</p>
       </div>
       <div class="list-hero-summary">
-        <div class="summary-pill"><span class="summary-label">开放课程</span><strong class="summary-value">${classes.length}</strong></div>
-        <div class="summary-pill"><span class="summary-label">报名类型</span><strong class="summary-value">报名 / 候补</strong></div>
+        <div class="summary-pill"><span class="summary-label">当前可见课程</span><strong class="summary-value">${total}</strong></div>
+        <div class="summary-pill"><span class="summary-label">报名路径</span><strong class="summary-value">报名 / 候补</strong></div>
       </div>
     </section>
     <section class="grid class-card-grid">${cards}</section>
+    ${paginationHtml("#/public/classes", page, LIST_PAGE_SIZE, total)}
     ${publicFaqHtml()}
   `);
 }
@@ -368,7 +464,7 @@ async function renderPublicList() {
 async function renderPublicDetail(classId) {
   const detail = await api.getPublicClassDetail(classId);
   if (!detail) {
-    setHtml(errorStateHtml("课程不存在或已下架", "#/public/classes"));
+    setHtml(errorStateHtml("课程不存在或不可见", "#/public/classes"));
     return;
   }
 
@@ -378,6 +474,8 @@ async function renderPublicDetail(classId) {
   const minStudents = detail.minStudents ?? "-";
   const maxStudents = detail.maxStudents ?? "-";
   const remainingSeats = detail.remainingSeats ?? (typeof detail.maxStudents === "number" ? Math.max(detail.maxStudents - currentStudents, 0) : null);
+  const coverImage = detail.coverImageUrl ? `<img class="detail-cover-image" src="${detail.coverImageUrl}" alt="${detail.className || "课程封面"}" />` : "";
+  const highlights = detail.highlights ? `<section class="panel detail-highlights-panel"><h3>课程亮点</h3><p>${detail.highlights}</p></section>` : "";
 
   setHtml(`
     <section class="panel detail-hero">
@@ -385,12 +483,12 @@ async function renderPublicDetail(classId) {
         <p class="section-kicker">Class Detail</p>
         <div class="detail-head-row">
           <div>
-            <h2>${escapeHtml(detail.className)}</h2>
-            <p class="muted detail-subtitle">${escapeHtml(detail.courseSubtitle || "暂无副标题")}</p>
+            <h2>${detail.className}</h2>
+            <p class="muted detail-subtitle">${detail.courseSubtitle || "暂未配置"}</p>
           </div>
           ${statusChip(detail.status, detail.statusLabel)}
         </div>
-        <p class="detail-progress">${escapeHtml(detail.progressText || "课程正在报名中")}</p>
+        <p class="detail-progress">${detail.progressText || "当前课程信息已接入真实后端状态联动。"}</p>
         <div class="detail-metrics">
           <div class="metric-tile metric-tile-accent"><span class="metric-label">剩余名额</span><strong class="metric-value">${remainingSeats ?? "-"}</strong></div>
           <div class="metric-tile"><span class="metric-label">课程价格</span><strong class="metric-value">¥${detail.priceAmount ?? "-"}</strong></div>
@@ -398,78 +496,113 @@ async function renderPublicDetail(classId) {
         </div>
       </div>
       <aside class="detail-hero-side">
+        ${coverImage}
         <div class="detail-side-card">
-          <h3>报名关键信息</h3>
+          <h3>报名决策信息</h3>
           <dl class="detail-facts detail-facts-stack">
-            <div><dt>上课安排</dt><dd>${escapeHtml(detail.scheduleSummary || "待确认")}</dd></div>
-            <div><dt>课程日期</dt><dd>${formatDateRange(detail.startDate, detail.endDate)}</dd></div>
-            <div><dt>成班规则</dt><dd>${minStudents} 人起，最多 ${maxStudents} 人</dd></div>
+            <div><dt>上课时间</dt><dd>${detail.scheduleSummary || "暂未配置"}</dd></div>
+            <div><dt>开课周期</dt><dd>${formatDateRange(detail.startDate, detail.endDate)}</dd></div>
+            <div><dt>成班门槛</dt><dd>${minStudents} 人开班，最多 ${maxStudents} 人</dd></div>
           </dl>
+          <button id="copy-share-link-btn" type="button" class="btn primary share-link-btn">复制分享链接</button>
+          <p id="manual-share-link" class="muted manual-share-link" hidden>${window.location.href}</p>
         </div>
       </aside>
     </section>
+    ${highlights}
     <section class="detail-content-grid">
       <article class="panel detail-section-card">
-        <h3>适合人群</h3><p class="detail-copy">${escapeHtml(detail.targetAudience || "暂无说明")}</p>
-        <h3>不适合人群</h3><p class="detail-copy">${escapeHtml(detail.unsuitableAudience || "暂无说明")}</p>
+        <h3>适合对象</h3><p class="detail-copy">${detail.targetAudience || "暂未配置"}</p>
+        <h3>不适合对象</h3><p class="detail-copy">${detail.unsuitableAudience || "暂未配置"}</p>
       </article>
       <article class="panel detail-section-card">
-        <h3>课程目标</h3><p class="detail-copy">${escapeHtml(detail.courseGoal || "暂无说明")}</p>
+        <h3>课程目标</h3><p class="detail-copy">${detail.courseGoal || "暂未配置"}</p>
       </article>
     </section>
     <section class="panel detail-rules-panel">
-      <h3>课程规则</h3>
+      <h3>规则说明</h3>
       <div class="detail-rules-grid">
-        <article class="detail-rule-card"><h4>成班规则</h4><p>${escapeHtml(detail.groupRule || "暂无说明")}</p></article>
-        <article class="detail-rule-card"><h4>缺课规则</h4><p>${escapeHtml(detail.absenceRule || "暂无说明")}</p></article>
-        <article class="detail-rule-card"><h4>候补规则</h4><p>${escapeHtml(detail.waitlistRule || "暂无说明")}</p></article>
-        <article class="detail-rule-card"><h4>不成班处理</h4><p>${escapeHtml(detail.failureRule || "暂无说明")}</p></article>
+        <article class="detail-rule-card"><h4>成班规则</h4><p>${detail.groupRule || "暂未配置"}</p></article>
+        <article class="detail-rule-card"><h4>缺课规则</h4><p>${detail.absenceRule || "暂未配置"}</p></article>
+        <article class="detail-rule-card"><h4>候补规则</h4><p>${detail.waitlistRule || "暂未配置"}</p></article>
+        <article class="detail-rule-card"><h4>不成班处理</h4><p>${detail.failureRule || "暂未配置"}</p></article>
       </div>
     </section>
-    <section class="panel detail-faq-panel"><h3>FAQ 摘要</h3><p class="muted">${escapeHtml(detail.faqSummary || "暂无说明")}</p></section>
+    <section class="panel detail-faq-panel"><h3>FAQ 摘要</h3><p class="muted">${detail.faqSummary || "暂未配置"}</p></section>
     <section class="detail-bottom-cta">
       <div class="container detail-bottom-cta-inner">
-        <a class="btn primary" href="#/public/enroll/${classId}?type=${ctaType}">${escapeHtml(ctaLabel)}</a>
+        <a class="btn primary" href="#/public/enroll/${classId}?type=${ctaType}">${ctaLabel}</a>
         <a class="btn" href="#/public/enroll/${classId}?type=WAITLIST">加入候补</a>
         <a class="btn" href="#/public/classes">返回看板</a>
       </div>
     </section>
   `);
+  bindShareLinkButton();
+}
+
+function bindShareLinkButton() {
+  const button = document.getElementById("copy-share-link-btn");
+  const fallback = document.getElementById("manual-share-link");
+  if (!button) return;
+  button.addEventListener("click", async () => {
+    const url = window.location.href;
+    try {
+      const copied = await copyText(url);
+      if (copied) {
+        showToast("链接已复制", "success");
+        return;
+      }
+    } catch {
+      // Fall through to manual fallback.
+    }
+    if (fallback) {
+      fallback.hidden = false;
+      fallback.textContent = url;
+    }
+    showToast("请手动复制链接", "info");
+  });
 }
 
 function enrollmentFormHtml(classId, registerType = "ENROLLMENT") {
   const isWaitlist = registerType === "WAITLIST";
-  const title = isWaitlist ? "候补登记" : "课程报名";
-  const desc = isWaitlist ? "课程名额不足时可先登记候补，运营会按情况联系确认。" : "填写家长和学员信息，提交后由老师或运营联系确认。";
+  const title = isWaitlist ? "加入候补" : "课程报名";
+  const desc = isWaitlist ? "满员后将按照提交顺序通知，请确认联系方式准确。" : "填写学员与家长信息后提交，老师会尽快联系确认。";
+  const sideTitle = isWaitlist ? "候补流程" : "提交流程";
+  const sideText = isWaitlist ? "提交候补后等待空位，运营会联系确认是否转正。" : "提交后会进入人工确认流程，确认结果会通过电话或微信通知。";
+  const studentNameLabel = isWaitlist ? "学员姓名（选填）" : '学员姓名 <span class="required-mark">*</span>';
+  const englishLevelLabel = isWaitlist ? "英语基础（选填）" : '英语基础 <span class="required-mark">*</span>';
+  const waitlistFields = isWaitlist
+    ? `<label class="checkbox-row full-span"><input type="checkbox" name="acceptSimilarRecommendation" value="true" /><span>是否愿意接受相近课程的推荐（勾选后运营可优先为你匹配其他课程）</span></label>`
+    : "";
   return `
     <section class="panel enrollment-shell">
       <div class="enrollment-hero">
         <div><p class="section-kicker">Enrollment</p><h2>${title}</h2><p class="muted enrollment-hero-text">${desc}</p></div>
-        <aside class="enrollment-side-note"><strong>提交说明</strong><p>报名信息仅用于课程确认和后续沟通，请填写真实联系方式。</p></aside>
+        <aside class="enrollment-side-note"><strong>${sideTitle}</strong><p>${sideText}</p></aside>
       </div>
       <form id="registration-form" class="enrollment-form">
         <section class="form-section">
-          <div class="form-section-head"><h3>家长信息</h3><p class="muted">用于运营联系和课程确认。</p></div>
+          <div class="form-section-head"><h3>家长信息</h3><p class="muted">用于后续联系确认课程安排。</p></div>
           <div class="form-grid two-columns">
             <div class="row"><label>家长姓名 <span class="required-mark">*</span></label><input name="parentName" placeholder="请输入家长姓名" required /></div>
-            <div class="row"><label>联系电话 <span class="required-mark">*</span></label><input name="contactInfo" inputmode="numeric" placeholder="请输入 11 位手机号" required /></div>
+            <div class="row"><label>联系方式（手机号） <span class="required-mark">*</span></label><input name="contactInfo" inputmode="numeric" placeholder="请输入 11 位手机号" required /></div>
           </div>
         </section>
         <section class="form-section">
-          <div class="form-section-head"><h3>学员信息</h3><p class="muted">帮助老师判断课程匹配度。</p></div>
+          <div class="form-section-head"><h3>学员信息</h3><p class="muted">帮助老师快速判断分班与课程适配度。</p></div>
           <div class="form-grid two-columns">
-            <div class="row"><label>学员姓名${isWaitlist ? "" : ' <span class="required-mark">*</span>'}</label><input name="studentName" placeholder="请输入学员姓名" ${isWaitlist ? "" : "required"} /></div>
-            <div class="row"><label>学员年级 <span class="required-mark">*</span></label><input name="studentGrade" placeholder="例如：三年级" required /></div>
-            <div class="row full-span"><label>英语基础${isWaitlist ? "" : ' <span class="required-mark">*</span>'}</label><input name="englishLevel" placeholder="例如：基础薄弱、阅读待提升" ${isWaitlist ? "" : "required"} /></div>
+            <div class="row"><label>${studentNameLabel}</label><input name="studentName" placeholder="请输入学员姓名" ${isWaitlist ? "" : "required"} /></div>
+            <div class="row"><label>学员年级 <span class="required-mark">*</span></label><input name="studentGrade" placeholder="如：三年级" required /></div>
+            <div class="row full-span"><label>${englishLevelLabel}</label><input name="englishLevel" placeholder="如：校内基础一般，可进行简单阅读" ${isWaitlist ? "" : "required"} /></div>
           </div>
         </section>
         <section class="form-section">
-          <div class="form-section-head"><h3>补充说明</h3><p class="muted">可填写时间偏好、学习目标或其他需要说明的信息。</p></div>
-          <div class="form-grid"><div class="row full-span"><label>备注</label><textarea name="remark" placeholder="请输入补充说明"></textarea></div></div>
+          <div class="form-section-head"><h3>补充说明</h3><p class="muted">可填写时间偏好、学习目标或其他说明。</p></div>
+          <div class="form-grid"><div class="row full-span"><label>备注</label><textarea name="remark" placeholder="如：希望尽量安排工作日晚间时段"></textarea></div>${waitlistFields}</div>
         </section>
         <div class="form-submit-bar">
-          <div><strong>确认提交报名信息</strong><p class="muted">提交后请等待老师或运营联系。</p></div>
-          <div class="actions form-submit-actions"><button id="registration-submit-btn" type="submit" class="primary">提交报名</button><a class="btn" href="#/public/classes/${classId}">返回详情</a></div>
+          <div><strong>提交前请确认信息准确</strong><p class="muted">手机号格式错误会导致无法提交。</p></div>
+          <div class="actions form-submit-actions"><button id="registration-submit-btn" type="submit" class="primary">确认提交</button><a class="btn" href="#/public/classes/${classId}">返回详情</a></div>
         </div>
         <p id="form-error" class="error" hidden></p>
       </form>
@@ -477,19 +610,87 @@ function enrollmentFormHtml(classId, registerType = "ENROLLMENT") {
   `;
 }
 
-function renderEnrollmentSuccess(result, classId) {
+function enrollmentSuccessSteps(registerType) {
+  const mapping = {
+    ENROLLMENT: {
+      title: "报名提交成功",
+      intro: "当前为报名申请，名额需等待运营/老师人工确认后锁定。",
+      steps: [
+        ["已收到报名申请", "系统已记录家长和学员信息。"],
+        ["等待人工确认", "运营/老师会核对名额、时间和缴费安排。"],
+        ["确认后通知安排", "确认成功后会通过联系方式同步上课和付款信息。"],
+      ],
+    },
+    WAITLIST: {
+      title: "候补提交成功",
+      intro: "当前为候补申请，有空位或相近课程时会再通知确认。",
+      steps: [
+        ["已进入候补队列", "系统已记录候补意向和可接受推荐设置。"],
+        ["等待空位释放", "运营会按候补顺序或课程匹配情况跟进。"],
+        ["有机会后通知", "出现空位或相近课程时会联系确认是否转入。"],
+      ],
+    },
+    TRIAL: {
+      title: "试听申请成功",
+      intro: "当前为试听申请，老师/运营会先确认试听时间和适配情况。",
+      steps: [
+        ["已收到试听申请", "系统已记录学员基础和联系方式。"],
+        ["老师/运营确认", "会进一步确认试听时间、课程适配度和准备事项。"],
+        ["确认后安排试听", "确认成功后会通知试听入口、时间和后续报名方式。"],
+      ],
+    },
+  };
+  return mapping[registerType] || mapping.ENROLLMENT;
+}
+
+async function renderEnrollmentSuccess(result, classId) {
+  let classDetail = null;
+  try {
+    classDetail = await api.getPublicClassDetail(classId);
+  } catch {
+    classDetail = null;
+  }
+  const registerType = result.registerType || "ENROLLMENT";
+  const successContent = enrollmentSuccessSteps(registerType);
+  const progressText = classDetail?.progressText || "请保持电话畅通，便于及时确认班级安排。";
+  const waitlistNotice = registerType === "WAITLIST" || ["FULL", "WAITLIST_OPEN"].includes(result.classStatus)
+    ? '<p class="muted">您已加入候补，如有空位将尽快通知。</p>'
+    : "";
+  const waitlistQueueHtml = registerType === "WAITLIST" && (result.waitlistPosition || result.waitlistCount)
+    ? `<p><strong>候补位置：</strong>${result.waitlistPosition || "-"}${result.waitlistCount ? ` / 当前候补 ${result.waitlistCount} 人` : ""}</p>`
+    : "";
+  const similarClasses = classDetail?.similarClasses || [];
+  const similarClassesHtml = similarClasses.length ? `
+    <section class="panel success-similar">
+      <h3>可同时关注的相近课程</h3>
+      <div class="success-similar-list">
+        ${similarClasses.map((item) => `<a class="success-similar-item" href="#/public/classes/${item.classId}"><strong>${item.className || "未命名课程"}</strong><span>${item.statusLabel || classStatusLabel(item.status)} · ${item.progressText || item.scheduleSummary || "查看课程详情"}</span></a>`).join("")}
+      </div>
+    </section>
+  ` : "";
   setHtml(`
     <section class="panel success-hero">
       <div class="success-icon" aria-hidden="true"></div>
-      <h2>报名提交成功</h2>
-      <p class="muted">报名编号：${escapeHtml(result.registrationId || "-")}</p>
+      <h2>${successContent.title}</h2>
+      <p class="muted">报名编号：${result.registrationId || "-"}</p>
     </section>
     <section class="success-grid">
-      <article class="panel success-card"><h3>报名信息</h3><p><strong>报名类型：</strong>${registrationTypeLabel(result.registerType)}</p><p><strong>报名状态：</strong>${escapeHtml(result.registrationStatus || "-")}</p><p><strong>课程状态：</strong>${escapeHtml(result.classStatus || "-")}</p></article>
-      <article class="panel success-card"><h3>下一步</h3><p>${escapeHtml(result.nextStepText || "提交成功，老师或运营将尽快联系确认。")}</p><p class="muted">请保持电话畅通，如需调整信息请联系运营。</p></article>
+      <article class="panel success-card"><h3>报名信息</h3><p><strong>报名类型：</strong>${registrationTypeLabel(registerType)}</p><p><strong>报名状态：</strong>${result.registrationStatus || "-"}</p><p><strong>课程状态：</strong>${classStatusLabel(result.classStatus)}</p>${waitlistQueueHtml}</article>
+      <article class="panel success-card"><h3>后续说明</h3><p>${successContent.intro}</p><p class="muted">${result.nextStepText || "提交成功，老师/运营将尽快联系确认。"}</p><p class="muted">${progressText}</p>${waitlistNotice}</article>
     </section>
-    <section class="panel success-actions"><div class="actions"><a class="btn primary" href="#/public/classes">返回看板</a><a class="btn" href="#/public/classes/${classId}">查看课程详情</a></div></section>
+    <section class="panel success-process">
+      <h3>后续流程</h3>
+      <div class="success-step-list">${successContent.steps.map(([title, text], index) => `<div class="success-step"><span>${index + 1}</span><div><strong>${title}</strong><p class="muted">${text}</p></div></div>`).join("")}</div>
+    </section>
+    ${similarClassesHtml}
+    <section class="panel success-actions"><div class="actions"><a class="btn primary" href="#/public/classes">返回看板</a><a class="btn" href="#/public/classes/${classId}">查看课程详情</a><button id="copy-class-link-btn" type="button" class="btn">复制课程链接</button></div></section>
   `);
+  const copyButton = document.getElementById("copy-class-link-btn");
+  copyButton?.addEventListener("click", async () => {
+    const url = `${window.location.origin}${window.location.pathname}#/public/classes/${classId}`;
+    const copied = await copyText(url);
+    showToast(copied ? "课程链接已复制" : "复制失败，请手动复制地址栏链接", copied ? "success" : "error");
+  });
 }
 
 function bindEnrollmentSubmit(classId, registerType) {
@@ -503,7 +704,7 @@ function bindEnrollmentSubmit(classId, registerType) {
     const contactInfo = String(formData.get("contactInfo") || "").trim();
     if (!/^1\d{10}$/.test(contactInfo)) {
       errorNode.hidden = false;
-      errorNode.textContent = "请输入有效的 11 位手机号。";
+      errorNode.textContent = "手机号格式不正确，请输入 11 位手机号。";
       return;
     }
     errorNode.hidden = true;
@@ -521,10 +722,13 @@ function bindEnrollmentSubmit(classId, registerType) {
       acceptWaitlist: true,
       wantsTrial: registerType === "TRIAL",
     };
+    if (registerType === "WAITLIST") {
+      payload.acceptSimilarRecommendation = formData.get("acceptSimilarRecommendation") === "true";
+    }
     try {
       const result = await api.submitRegistration(payload);
       showToast("报名提交成功", "success");
-      renderEnrollmentSuccess(result, classId);
+      await renderEnrollmentSuccess(result, classId);
     } catch (error) {
       errorNode.hidden = false;
       errorNode.textContent = error.message || "提交失败，请稍后重试。";
@@ -540,76 +744,71 @@ async function renderEnroll(classId, queryParams) {
   bindEnrollmentSubmit(classId, type);
 }
 
-function adminClassFormHtml(detail = {}, isEdit = false) {
+function adminClassFormHtml(detail = {}, isEdit = false, templates = []) {
+  const templateOptions = templates.map((template) => `<option value="${template.templateId}" ${detail.templateId === template.templateId ? "selected" : ""}>${template.templateName}</option>`).join("");
+  const templateSelect = isEdit ? "" : `
+          <div class="row full-span"><label>课程模板</label><select name="templateId"><option value="">不使用模板</option>${templateOptions}</select></div>
+  `;
+  const stepNav = isEdit ? "" : `
+      <div class="class-form-stepper" aria-label="创建课程步骤">
+        <span><strong>1</strong>基础信息</span>
+        <span><strong>2</strong>拼课规则</span>
+        <span><strong>3</strong>展示文案</span>
+      </div>
+  `;
   return `
     <section class="panel admin-hero">
-      <div><p class="section-kicker">Admin Class Form</p><h2>${isEdit ? "编辑课程" : "新建课程"}</h2><p class="muted admin-hero-text">${isEdit ? "调整课程信息并保存草稿。" : "创建课程草稿，之后可提交审核。"}</p></div>
+      <div><p class="section-kicker">Admin Class Form</p><h2>${isEdit ? "编辑课程" : "创建新课程"}</h2><p class="muted admin-hero-text">${isEdit ? "修改课程字段并保存草稿版本。" : "填写课程信息并保存草稿，后续提交审核。"}</p></div>
     </section>
     <form id="admin-class-form" class="panel admin-class-form">
       <input type="hidden" name="version" value="${detail.version || ""}" />
-      <section class="form-section">
-        <div class="form-section-head"><h3>基础信息</h3><p class="muted">课程名称、类型和价格信息。</p></div>
+      ${stepNav}
+      <section class="form-section ${isEdit ? "" : "class-form-step"}">
+        ${isEdit ? "" : '<span class="step-badge">Step 1</span>'}
+        <div class="form-section-head"><h3>基础信息</h3><p class="muted">课程基本属性与价格配置。</p></div>
         <div class="form-grid two-columns">
-          <div class="row"><label>课程名称 <span class="required-mark">*</span></label><input name="className" value="${escapeHtml(detail.className || "")}" required /></div>
+          ${templateSelect}
+          <div class="row"><label>课程名称</label><input name="className" value="${detail.className || ""}" /></div>
           <div class="row"><label>课程类型 <span class="required-mark">*</span></label><select name="classType" required><option value="GROUP_CLASS" ${detail.classType === "GROUP_CLASS" ? "selected" : ""}>GROUP_CLASS</option><option value="TRIAL" ${detail.classType === "TRIAL" ? "selected" : ""}>TRIAL</option><option value="NORMAL" ${detail.classType === "NORMAL" ? "selected" : ""}>NORMAL</option></select></div>
-          <div class="row"><label>课程副标题</label><input name="courseSubtitle" value="${escapeHtml(detail.courseSubtitle || "")}" /></div>
+          <div class="row"><label>课程副标题</label><input name="courseSubtitle" value="${detail.courseSubtitle || ""}" /></div>
+          <div class="row full-span"><label>封面图 URL</label><input name="coverImageUrl" value="${detail.coverImageUrl || ""}" placeholder="https://..." /></div>
+          <div class="row"><label>负责人 ID</label><input name="ownerId" value="${detail.ownerId || ""}" /></div>
           <div class="row"><label>课程价格</label><input name="priceAmount" type="number" min="0" value="${detail.priceAmount ?? ""}" /></div>
-          <div class="row"><label>定金金额</label><input name="depositAmount" type="number" min="0" value="${detail.depositAmount ?? ""}" /></div>
+          <div class="row"><label>订金金额</label><input name="depositAmount" type="number" min="0" value="${detail.depositAmount ?? ""}" /></div>
         </div>
       </section>
-      <section class="form-section">
-        <div class="form-section-head"><h3>排课与人数</h3><p class="muted">成班人数、课时和时间安排。</p></div>
+      <section class="form-section ${isEdit ? "" : "class-form-step"}">
+        ${isEdit ? "" : '<span class="step-badge">Step 2</span>'}
+        <div class="form-section-head"><h3>拼课规则</h3><p class="muted">成班人数、课时与时间配置。</p></div>
         <div class="form-grid two-columns">
-          <div class="row"><label>最低人数</label><input name="minStudents" type="number" min="1" value="${detail.minStudents ?? ""}" /></div>
+          <div class="row"><label>最少人数</label><input name="minStudents" type="number" min="1" value="${detail.minStudents ?? ""}" /></div>
           <div class="row"><label>最多人数</label><input name="maxStudents" type="number" min="1" value="${detail.maxStudents ?? ""}" /></div>
           <div class="row"><label>课时数</label><input name="sessionCount" type="number" min="1" value="${detail.sessionCount ?? ""}" /></div>
-          <div class="row"><label>上课安排</label><input name="scheduleSummary" value="${escapeHtml(detail.scheduleSummary || "")}" /></div>
-          <div class="row"><label>开始时间</label><input name="startDate" type="datetime-local" value="${detail.startDate ? detail.startDate.slice(0, 16) : ""}" /></div>
-          <div class="row"><label>结束时间</label><input name="endDate" type="datetime-local" value="${detail.endDate ? detail.endDate.slice(0, 16) : ""}" /></div>
+          <div class="row"><label>上课安排</label><input name="scheduleSummary" value="${detail.scheduleSummary || ""}" /></div>
+          <div class="row"><label>开始日期</label><input name="startDate" type="datetime-local" value="${detail.startDate ? detail.startDate.slice(0, 16) : ""}" /></div>
+          <div class="row"><label>结束日期</label><input name="endDate" type="datetime-local" value="${detail.endDate ? detail.endDate.slice(0, 16) : ""}" /></div>
           <div class="row full-span"><label>报名截止</label><input name="signupDeadline" type="datetime-local" value="${detail.signupDeadline ? detail.signupDeadline.slice(0, 16) : ""}" /></div>
         </div>
       </section>
-      <section class="form-section">
-        <div class="form-section-head"><h3>详情与规则</h3><p class="muted">前台课程详情页展示内容。</p></div>
+      <section class="form-section ${isEdit ? "" : "class-form-step"}">
+        ${isEdit ? "" : '<span class="step-badge">Step 3</span>'}
+        <div class="form-section-head"><h3>展示文案</h3><p class="muted">用于前台详情页展示的文案与规则说明。</p></div>
         <div class="form-grid two-columns">
-          <div class="row full-span"><label>适合人群</label><textarea name="targetAudience">${escapeHtml(detail.targetAudience || "")}</textarea></div>
-          <div class="row full-span"><label>不适合人群</label><textarea name="unsuitableAudience">${escapeHtml(detail.unsuitableAudience || "")}</textarea></div>
-          <div class="row full-span"><label>课程目标</label><textarea name="courseGoal">${escapeHtml(detail.courseGoal || "")}</textarea></div>
-          <div class="row"><label>成班规则</label><textarea name="groupRule">${escapeHtml(detail.groupRule || "")}</textarea></div>
-          <div class="row"><label>缺课规则</label><textarea name="absenceRule">${escapeHtml(detail.absenceRule || "")}</textarea></div>
-          <div class="row"><label>候补规则</label><textarea name="waitlistRule">${escapeHtml(detail.waitlistRule || "")}</textarea></div>
-          <div class="row"><label>不成班处理</label><textarea name="failureRule">${escapeHtml(detail.failureRule || "")}</textarea></div>
-          <div class="row full-span"><label>FAQ 摘要</label><textarea name="faqSummary">${escapeHtml(detail.faqSummary || "")}</textarea></div>
+          <div class="row full-span"><label>适合对象</label><textarea name="targetAudience">${detail.targetAudience || ""}</textarea></div>
+          <div class="row full-span"><label>课程亮点</label><textarea name="highlights">${detail.highlights || ""}</textarea></div>
+          <div class="row full-span"><label>不适合对象</label><textarea name="unsuitableAudience">${detail.unsuitableAudience || ""}</textarea></div>
+          <div class="row full-span"><label>课程目标</label><textarea name="courseGoal">${detail.courseGoal || ""}</textarea></div>
+          <div class="row"><label>拼班规则</label><textarea name="groupRule">${detail.groupRule || ""}</textarea></div>
+          <div class="row"><label>缺课规则</label><textarea name="absenceRule">${detail.absenceRule || ""}</textarea></div>
+          <div class="row"><label>候补规则</label><textarea name="waitlistRule">${detail.waitlistRule || ""}</textarea></div>
+          <div class="row"><label>不成班处理</label><textarea name="failureRule">${detail.failureRule || ""}</textarea></div>
+          <div class="row full-span"><label>FAQ 摘要</label><textarea name="faqSummary">${detail.faqSummary || ""}</textarea></div>
         </div>
       </section>
-      <div class="form-submit-bar"><div><strong>保存课程信息</strong><p class="muted">保存后可在后台详情页提交审核。</p></div><div class="actions form-submit-actions"><button id="admin-class-submit-btn" type="submit" class="primary">保存课程</button><a class="btn" href="#/admin/classes">返回列表</a></div></div>
+      <div class="form-submit-bar"><div><strong>保存草稿</strong><p class="muted">保存后会跳转到详情页。</p></div><div class="actions form-submit-actions"><button id="admin-class-submit-btn" type="submit" class="primary">保存草稿</button><a class="btn" href="#/admin/classes">返回列表</a></div></div>
       <p id="admin-class-form-error" class="error" hidden></p>
     </form>
   `;
-}
-
-function ensureAdminClassExtraFields(form) {
-  if (form.querySelector('[name="openingLevel"]')) return;
-  const courseSubtitleInput = form.querySelector('[name="courseSubtitle"]');
-  const anchor = courseSubtitleInput?.closest(".row");
-  if (!anchor) return;
-  const fieldHtml = `
-    <div class="row"><label>开课等级</label><input name="openingLevel" placeholder="例：三年级进阶" /></div>
-    <div class="row"><label>等级标识</label><input name="levelMarker" placeholder="例：L3 / ADV" /></div>
-    <div class="row"><label>展示颜色</label><input name="displayColor" type="color" value="#2563eb" /></div>
-    <div class="row"><label>微信号</label><input name="wechatContact" /></div>
-    <div class="row"><label>手机联系方式</label><input name="phoneContact" inputmode="tel" /></div>
-  `;
-  anchor.insertAdjacentHTML("afterend", fieldHtml);
-}
-
-function fillAdminClassExtraFields(form, detail = {}) {
-  const fieldNames = ["openingLevel", "levelMarker", "displayColor", "wechatContact", "phoneContact"];
-  fieldNames.forEach((name) => {
-    const input = form.querySelector(`[name="${name}"]`);
-    if (!input) return;
-    input.value = detail[name] || (name === "displayColor" ? "#2563eb" : "");
-  });
 }
 
 function bindAdminClassForm(classId) {
@@ -617,7 +816,6 @@ function bindAdminClassForm(classId) {
   const errorNode = document.getElementById("admin-class-form-error");
   const submitButton = document.getElementById("admin-class-submit-btn");
   if (!form || !errorNode || !submitButton) return;
-  ensureAdminClassExtraFields(form);
   const isEdit = Boolean(classId);
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -626,13 +824,12 @@ function bindAdminClassForm(classId) {
     const formData = new FormData(form);
     const payload = {
       className: String(formData.get("className") || "").trim(),
+      templateId: String(formData.get("templateId") || "").trim(),
       classType: String(formData.get("classType") || "").trim(),
       courseSubtitle: String(formData.get("courseSubtitle") || "").trim(),
-      openingLevel: String(formData.get("openingLevel") || "").trim(),
-      levelMarker: String(formData.get("levelMarker") || "").trim(),
-      displayColor: String(formData.get("displayColor") || "").trim(),
-      wechatContact: String(formData.get("wechatContact") || "").trim(),
-      phoneContact: String(formData.get("phoneContact") || "").trim(),
+      coverImageUrl: String(formData.get("coverImageUrl") || "").trim(),
+      highlights: String(formData.get("highlights") || "").trim(),
+      ownerId: String(formData.get("ownerId") || "").trim(),
       priceAmount: parseIntOrNull(formData.get("priceAmount")),
       depositAmount: parseIntOrNull(formData.get("depositAmount")),
       minStudents: parseIntOrNull(formData.get("minStudents")),
@@ -650,7 +847,6 @@ function bindAdminClassForm(classId) {
       waitlistRule: String(formData.get("waitlistRule") || "").trim(),
       failureRule: String(formData.get("failureRule") || "").trim(),
       faqSummary: String(formData.get("faqSummary") || "").trim(),
-      actorId: getActorContext().actorId,
     };
     if (isEdit) payload.version = Number(formData.get("version") || 0);
     Object.keys(payload).forEach((key) => {
@@ -658,7 +854,7 @@ function bindAdminClassForm(classId) {
     });
     try {
       const result = isEdit ? await api.updateClass(classId, payload) : await api.createClass(payload);
-      showToast("课程已保存", "success");
+      showToast("保存成功", "success");
       window.location.hash = `#/admin/classes/${result.classId || classId}`;
     } catch (error) {
       errorNode.textContent = error.message || "保存失败";
@@ -669,8 +865,9 @@ function bindAdminClassForm(classId) {
   });
 }
 
-async function renderAdminCreateClass() {
-  setHtml(adminClassFormHtml({}, false));
+async function renderAdminCreateClass(queryParams = new URLSearchParams()) {
+  const templates = (await api.getAdminTemplates()).items || [];
+  setHtml(adminClassFormHtml({ templateId: queryParams.get("templateId") || "" }, false, templates.filter((template) => template.isActive)));
   bindAdminClassForm();
 }
 
@@ -682,37 +879,199 @@ async function renderAdminEditClass(classId) {
   }
   setHtml(adminClassFormHtml(detail, true));
   bindAdminClassForm(classId);
-  fillAdminClassExtraFields(document.getElementById("admin-class-form"), detail);
+}
+
+function templateFormHtml(detail = {}, isEdit = false) {
+  return `
+    <section class="panel admin-hero">
+      <div><p class="section-kicker">Admin Template Form</p><h2>${isEdit ? "编辑模板" : "创建课程模板"}</h2><p class="muted admin-hero-text">维护课程默认价格、人数、时间与前台展示文案。</p></div>
+    </section>
+    <form id="admin-template-form" class="panel admin-class-form">
+      <section class="form-section">
+        <div class="form-section-head"><h3>基础信息</h3><p class="muted">模板名称会用于创建课程时快速识别。</p></div>
+        <div class="form-grid two-columns">
+          <div class="row"><label>模板名称 <span class="required-mark">*</span></label><input name="templateName" value="${detail.templateName || ""}" required /></div>
+          <div class="row"><label>课程类型</label><select name="classType"><option value="">未设置</option><option value="GROUP_CLASS" ${detail.classType === "GROUP_CLASS" ? "selected" : ""}>GROUP_CLASS</option><option value="TRIAL" ${detail.classType === "TRIAL" ? "selected" : ""}>TRIAL</option><option value="NORMAL" ${detail.classType === "NORMAL" ? "selected" : ""}>NORMAL</option></select></div>
+          <div class="row"><label>默认价格</label><input name="defaultPriceAmount" type="number" min="0" value="${detail.defaultPriceAmount ?? ""}" /></div>
+          <div class="row"><label>默认订金</label><input name="defaultDepositAmount" type="number" min="0" value="${detail.defaultDepositAmount ?? ""}" /></div>
+          <div class="row"><label>最少人数</label><input name="defaultMinStudents" type="number" min="1" value="${detail.defaultMinStudents ?? ""}" /></div>
+          <div class="row"><label>最多人数</label><input name="defaultMaxStudents" type="number" min="1" value="${detail.defaultMaxStudents ?? ""}" /></div>
+          <div class="row"><label>默认课时</label><input name="defaultSessionCount" type="number" min="1" value="${detail.defaultSessionCount ?? ""}" /></div>
+          <div class="row"><label>默认上课安排</label><input name="defaultScheduleSummary" value="${detail.defaultScheduleSummary || ""}" /></div>
+          <div class="row full-span checkbox-row"><label><input name="isActive" type="checkbox" value="true" ${detail.isActive === false ? "" : "checked"} /> 启用模板</label></div>
+        </div>
+      </section>
+      <section class="form-section">
+        <div class="form-section-head"><h3>展示文案</h3><p class="muted">创建课程后会作为详情页默认文案。</p></div>
+        <div class="form-grid two-columns">
+          <div class="row full-span"><label>课程副标题</label><input name="defaultCourseSubtitle" value="${detail.defaultCourseSubtitle || ""}" /></div>
+          <div class="row full-span"><label>适合对象</label><textarea name="defaultTargetAudience">${detail.defaultTargetAudience || ""}</textarea></div>
+          <div class="row full-span"><label>不适合对象</label><textarea name="defaultUnsuitableAudience">${detail.defaultUnsuitableAudience || ""}</textarea></div>
+          <div class="row full-span"><label>课程目标</label><textarea name="defaultCourseGoal">${detail.defaultCourseGoal || ""}</textarea></div>
+          <div class="row"><label>拼班规则</label><textarea name="defaultGroupRule">${detail.defaultGroupRule || ""}</textarea></div>
+          <div class="row"><label>缺课规则</label><textarea name="defaultAbsenceRule">${detail.defaultAbsenceRule || ""}</textarea></div>
+          <div class="row"><label>候补规则</label><textarea name="defaultWaitlistRule">${detail.defaultWaitlistRule || ""}</textarea></div>
+          <div class="row"><label>不成班处理</label><textarea name="defaultFailureRule">${detail.defaultFailureRule || ""}</textarea></div>
+          <div class="row full-span"><label>FAQ 摘要</label><textarea name="defaultFaqSummary">${detail.defaultFaqSummary || ""}</textarea></div>
+        </div>
+      </section>
+      <div class="form-submit-bar"><div><strong>保存模板</strong><p class="muted">保存后返回模板详情页。</p></div><div class="actions form-submit-actions"><button id="admin-template-submit-btn" type="submit" class="primary">保存模板</button><a class="btn" href="#/admin/templates">返回列表</a></div></div>
+      <p id="admin-template-form-error" class="error" hidden></p>
+    </form>
+  `;
+}
+
+function templatePayloadFromForm(formData) {
+  const payload = {
+    templateName: String(formData.get("templateName") || "").trim(),
+    classType: String(formData.get("classType") || "").trim(),
+    defaultPriceAmount: parseIntOrNull(formData.get("defaultPriceAmount")),
+    defaultDepositAmount: parseIntOrNull(formData.get("defaultDepositAmount")),
+    defaultMinStudents: parseIntOrNull(formData.get("defaultMinStudents")),
+    defaultMaxStudents: parseIntOrNull(formData.get("defaultMaxStudents")),
+    defaultSessionCount: parseIntOrNull(formData.get("defaultSessionCount")),
+    defaultScheduleSummary: String(formData.get("defaultScheduleSummary") || "").trim(),
+    defaultCourseSubtitle: String(formData.get("defaultCourseSubtitle") || "").trim(),
+    defaultTargetAudience: String(formData.get("defaultTargetAudience") || "").trim(),
+    defaultUnsuitableAudience: String(formData.get("defaultUnsuitableAudience") || "").trim(),
+    defaultCourseGoal: String(formData.get("defaultCourseGoal") || "").trim(),
+    defaultGroupRule: String(formData.get("defaultGroupRule") || "").trim(),
+    defaultAbsenceRule: String(formData.get("defaultAbsenceRule") || "").trim(),
+    defaultWaitlistRule: String(formData.get("defaultWaitlistRule") || "").trim(),
+    defaultFailureRule: String(formData.get("defaultFailureRule") || "").trim(),
+    defaultFaqSummary: String(formData.get("defaultFaqSummary") || "").trim(),
+    isActive: formData.get("isActive") === "true",
+  };
+  Object.keys(payload).forEach((key) => {
+    if (payload[key] === "" || payload[key] === null) delete payload[key];
+  });
+  return payload;
+}
+
+function bindTemplateForm(templateId) {
+  const form = document.getElementById("admin-template-form");
+  const errorNode = document.getElementById("admin-template-form-error");
+  const submitButton = document.getElementById("admin-template-submit-btn");
+  if (!form || !errorNode || !submitButton) return;
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    errorNode.hidden = true;
+    const restoreButton = setButtonLoading(submitButton, "保存中...");
+    try {
+      const payload = templatePayloadFromForm(new FormData(form));
+      const result = templateId ? await api.updateTemplate(templateId, payload) : await api.createTemplate(payload);
+      showToast("模板已保存", "success");
+      window.location.hash = `#/admin/templates/${result.templateId || templateId}/edit`;
+    } catch (error) {
+      errorNode.textContent = error.message || "模板保存失败";
+      errorNode.hidden = false;
+      showToast(error.message || "模板保存失败", "error");
+      restoreButton();
+    }
+  });
+}
+
+async function renderAdminTemplates() {
+  const result = await api.getAdminTemplates();
+  const items = result.items || [];
+  const cards = items.map((item) => `
+    <article class="panel template-card">
+      <div class="admin-class-card-head"><div><h3>${item.templateName}</h3><p class="muted">ID：${item.templateId}</p></div>${statusChip(item.isActive ? "OPEN_FOR_ENROLLMENT" : "DRAFT", item.isActive ? "启用" : "停用")}</div>
+      <dl class="admin-class-card-info">
+        <div><dt>课程类型</dt><dd>${item.classType || "-"}</dd></div>
+        <div><dt>价格</dt><dd>${item.defaultPriceAmount ?? "-"}</dd></div>
+        <div><dt>人数</dt><dd>${item.defaultMinStudents ?? "-"}/${item.defaultMaxStudents ?? "-"}</dd></div>
+        <div><dt>上课安排</dt><dd>${item.defaultScheduleSummary || "-"}</dd></div>
+      </dl>
+      <div class="actions"><a class="btn" href="#/admin/templates/${item.templateId}/edit">编辑</a><a class="btn" href="#/admin/classes/new?templateId=${item.templateId}">用模板建课</a></div>
+    </article>
+  `).join("");
+  setHtml(`
+    <section class="panel admin-hero">
+      <div><p class="section-kicker">Admin Templates</p><h2>模板管理</h2><p class="muted admin-hero-text">维护常用课程模板，创建课程时可直接选用。</p></div>
+      <div class="admin-summary-grid"><div class="summary-pill"><span class="summary-label">模板总数</span><strong class="summary-value">${items.length}</strong></div><div class="summary-pill"><a class="btn primary" href="#/admin/templates/new">新建模板</a></div></div>
+    </section>
+    ${items.length ? `<section class="grid template-card-grid">${cards}</section>` : emptyStateHtml("暂无模板", "当前没有课程模板。")}
+  `);
+}
+
+async function renderAdminCreateTemplate() {
+  setHtml(templateFormHtml({}, false));
+  bindTemplateForm();
+}
+
+async function renderAdminEditTemplate(templateId) {
+  const detail = await api.getAdminTemplateDetail(templateId);
+  if (!detail) {
+    setHtml(errorStateHtml("模板不存在", "#/admin/templates"));
+    return;
+  }
+  setHtml(templateFormHtml(detail, true));
+  bindTemplateForm(templateId);
 }
 
 function reviewButtons(detail) {
+  const cancellableStatuses = ["OPEN_FOR_ENROLLMENT", "ALMOST_CONFIRMED", "CONFIRMED", "FULL", "WAITLIST_OPEN", "IN_PROGRESS"];
+  const cancelButton = cancellableStatuses.includes(detail.status) ? '<button class="btn danger" id="class-cancel-btn" type="button">取消课程</button>' : "";
   if (detail.status === "DRAFT" || detail.status === "REJECTED") return '<button class="btn primary" id="review-submit-btn" type="button">提交审核</button>';
   if (detail.status === "PENDING_REVIEW") return '<button class="btn primary" id="review-approve-btn" type="button">审核通过</button><button class="btn" id="review-reject-btn" type="button">驳回</button>';
-  return "";
+  return cancelButton;
 }
 
 function bindDetailReview(detail) {
-  const { actorId } = getActorContext();
-  const actions = [
-    ["review-submit-btn", "确认提交审核？", "提交中...", () => api.submitReview(detail.classId, detail.version, actorId), "已提交审核"],
-    ["review-approve-btn", "确认审核通过？", "处理中...", () => api.approveReview(detail.classId, detail.version, actorId), "已审核通过"],
-    ["review-reject-btn", "确认驳回？", "处理中...", () => api.rejectReview(detail.classId, detail.version, actorId), "已驳回"],
-  ];
-  actions.forEach(([id, confirmText, loadingText, action, successText]) => {
-    const button = document.getElementById(id);
-    if (!button) return;
-    button.addEventListener("click", async () => {
-      if (!window.confirm(confirmText)) return;
-      const restore = setButtonLoading(button, loadingText);
-      try {
-        await action();
-        showToast(successText, "success");
-        await renderAdminClassDetail(detail.classId);
-      } catch (error) {
-        showToast(error.message || "操作失败", "error");
-        restore();
-      }
-    });
+  const submitBtn = document.getElementById("review-submit-btn");
+  const approveBtn = document.getElementById("review-approve-btn");
+  const rejectBtn = document.getElementById("review-reject-btn");
+  const cancelBtn = document.getElementById("class-cancel-btn");
+  if (submitBtn) submitBtn.addEventListener("click", async () => {
+    if (!window.confirm("确认提交审核？")) return;
+    const restore = setButtonLoading(submitBtn, "提交中...");
+    try {
+      await api.submitReview(detail.classId, detail.version);
+      showToast("已提交审核", "success");
+      await renderAdminClassDetail(detail.classId);
+    } catch (error) {
+      showToast(error.message || "提交审核失败", "error");
+      restore();
+    }
+  });
+  if (approveBtn) approveBtn.addEventListener("click", async () => {
+    if (!window.confirm("确认审核通过？")) return;
+    const restore = setButtonLoading(approveBtn, "处理中...");
+    try {
+      await api.approveReview(detail.classId, detail.version);
+      showToast("审核通过", "success");
+      await renderAdminClassDetail(detail.classId);
+    } catch (error) {
+      showToast(error.message || "审核失败", "error");
+      restore();
+    }
+  });
+  if (rejectBtn) rejectBtn.addEventListener("click", async () => {
+    const rejection = promptRejectReason();
+    if (rejection === null) return;
+    if (!window.confirm("确认驳回？")) return;
+    const restore = setButtonLoading(rejectBtn, "处理中...");
+    try {
+      await api.rejectReview(detail.classId, detail.version, rejection);
+      showToast("已驳回", "success");
+      await renderAdminClassDetail(detail.classId);
+    } catch (error) {
+      showToast(error.message || "驳回失败", "error");
+      restore();
+    }
+  });
+  if (cancelBtn) cancelBtn.addEventListener("click", async () => {
+    if (!window.confirm("确认取消本课程？此操作不可撤销。")) return;
+    const restore = setButtonLoading(cancelBtn, "取消中...");
+    try {
+      await api.cancelClass(detail.classId, detail.version);
+      showToast("课程已取消", "success");
+      await renderAdminClassDetail(detail.classId);
+    } catch (error) {
+      showToast(error.message || "取消课程失败", "error");
+      restore();
+    }
   });
 }
 
@@ -730,17 +1089,17 @@ async function renderAdminClassDetail(classId) {
     <section class="panel admin-detail-hero">
       <div>
         <p class="section-kicker">Admin Class Detail</p>
-        <div class="detail-head-row"><div><h2>${escapeHtml(detail.className)}</h2><p class="muted detail-subtitle">${escapeHtml(detail.courseSubtitle || "暂无副标题")}</p></div>${statusChip(detail.status, detail.statusLabel || detail.status)}</div>
-        <p class="detail-progress">${escapeHtml(detail.progressText || "后台课程详情")}</p>
+        <div class="detail-head-row"><div><h2>${detail.className}</h2><p class="muted detail-subtitle">${detail.courseSubtitle || "用于后台查看课程状态、规则、时间与后续操作信息。"}</p></div>${statusChip(detail.status, detail.statusLabel || detail.status)}</div>
+        <p class="detail-progress">${detail.progressText || "当前课程详情可用于运营判断与后续动作承接。"}</p>
       </div>
       <div class="admin-detail-summary">
-        <div class="summary-pill"><span class="summary-label">课程 ID</span><strong class="summary-value admin-detail-id">${escapeHtml(detail.classId || classId)}</strong></div>
-        <div class="summary-pill"><span class="summary-label">可用操作</span><div class="action-tags">${(detail.actions || []).map((item) => `<span class="action-tag">${actionLabel(item)}</span>`).join("")}</div></div>
+        <div class="summary-pill"><span class="summary-label">课程 ID</span><strong class="summary-value admin-detail-id">${detail.classId || classId}</strong></div>
+        <div class="summary-pill"><span class="summary-label">可操作动作</span><div class="action-tags">${(detail.actions || []).map((item) => `<span class="action-tag">${item}</span>`).join("")}</div></div>
       </div>
     </section>
     <section class="admin-detail-grid">
       <article class="panel admin-detail-main">
-        <h3>运营数据</h3>
+        <h3>运营摘要</h3>
         <div class="admin-metric-grid">
           <div class="metric-tile metric-tile-accent"><span class="metric-label">剩余名额</span><strong class="metric-value">${remainingSeats ?? "-"}</strong></div>
           <div class="metric-tile"><span class="metric-label">当前人数</span><strong class="metric-value">${currentStudents}/${maxStudents}</strong></div>
@@ -748,29 +1107,29 @@ async function renderAdminClassDetail(classId) {
           <div class="metric-tile"><span class="metric-label">课时数</span><strong class="metric-value">${detail.sessionCount ?? "-"}</strong></div>
         </div>
         <dl class="admin-detail-facts">
-          <div><dt>课程类型</dt><dd>${escapeHtml(detail.classType || "-")}</dd></div>
-          <div><dt>上课安排</dt><dd>${escapeHtml(detail.scheduleSummary || "待确认")}</dd></div>
-          <div><dt>课程日期</dt><dd>${formatDateRange(detail.startDate, detail.endDate)}</dd></div>
-          <div><dt>报名截止</dt><dd>${escapeHtml(detail.signupDeadline || "-")}</dd></div>
-          <div><dt>成班规则</dt><dd>${minStudents} 人起，最多 ${maxStudents} 人</dd></div>
-          <div><dt>更新时间</dt><dd>${escapeHtml(detail.updatedAt || "-")}</dd></div>
+          <div><dt>课程类型</dt><dd>${detail.classType || "-"}</dd></div>
+          <div><dt>上课时间</dt><dd>${detail.scheduleSummary || "暂未配置"}</dd></div>
+          <div><dt>开课周期</dt><dd>${formatDateRange(detail.startDate, detail.endDate)}</dd></div>
+          <div><dt>报名截止</dt><dd>${detail.signupDeadline || "-"}</dd></div>
+          <div><dt>成班规则</dt><dd>${minStudents} 人开班，最多 ${maxStudents} 人</dd></div>
+          <div><dt>最近更新时间</dt><dd>${detail.updatedAt || "-"}</dd></div>
         </dl>
       </article>
       <aside class="admin-detail-side">
         <section class="panel admin-side-card">
-          <h3>课程内容</h3>
-          <p class="detail-copy"><strong>适合人群：</strong>${escapeHtml(detail.targetAudience || "暂无说明")}</p>
-          <p class="detail-copy"><strong>不适合人群：</strong>${escapeHtml(detail.unsuitableAudience || "暂无说明")}</p>
-          <p class="detail-copy"><strong>课程目标：</strong>${escapeHtml(detail.courseGoal || "暂无说明")}</p>
+          <h3>适配与目标</h3>
+          <p class="detail-copy"><strong>适合对象：</strong>${detail.targetAudience || "暂未配置"}</p>
+          <p class="detail-copy"><strong>不适合对象：</strong>${detail.unsuitableAudience || "暂未配置"}</p>
+          <p class="detail-copy"><strong>课程目标：</strong>${detail.courseGoal || "暂未配置"}</p>
         </section>
         <section class="panel admin-side-card">
           <h3>规则与 FAQ</h3>
           <dl class="detail-facts detail-facts-stack">
-            <div><dt>成班规则</dt><dd>${escapeHtml(detail.groupRule || "暂无说明")}</dd></div>
-            <div><dt>缺课规则</dt><dd>${escapeHtml(detail.absenceRule || "暂无说明")}</dd></div>
-            <div><dt>候补规则</dt><dd>${escapeHtml(detail.waitlistRule || "暂无说明")}</dd></div>
-            <div><dt>不成班处理</dt><dd>${escapeHtml(detail.failureRule || "暂无说明")}</dd></div>
-            <div><dt>FAQ 摘要</dt><dd>${escapeHtml(detail.faqSummary || "暂无说明")}</dd></div>
+            <div><dt>拼班规则</dt><dd>${detail.groupRule || "暂未配置"}</dd></div>
+            <div><dt>缺课规则</dt><dd>${detail.absenceRule || "暂未配置"}</dd></div>
+            <div><dt>候补规则</dt><dd>${detail.waitlistRule || "暂未配置"}</dd></div>
+            <div><dt>不成班处理</dt><dd>${detail.failureRule || "暂未配置"}</dd></div>
+            <div><dt>FAQ 摘要</dt><dd>${detail.faqSummary || "暂未配置"}</dd></div>
           </dl>
           <div class="actions admin-detail-actions">${reviewButtons(detail)}<a class="btn" href="#/admin/classes/${classId}/edit">编辑课程</a><a class="btn" href="#/admin/classes">返回课程列表</a></div>
         </section>
@@ -788,38 +1147,46 @@ function bindAdminClassQuickActions() {
     if (!target) return;
     const classId = target.getAttribute("data-class-id");
     const action = target.getAttribute("data-action");
-    const { actorId } = getActorContext();
-    if (!window.confirm(`确认执行 ${actionLabel(action)}？`)) return;
+    if (!window.confirm(`确认执行 ${action} ?`)) return;
     try {
       const detail = await api.getAdminClassDetail(classId);
       if (!detail) return;
-      if (action === "submit_review") await api.submitReview(classId, detail.version, actorId);
-      if (action === "approve") await api.approveReview(classId, detail.version, actorId);
-      if (action === "reject") await api.rejectReview(classId, detail.version, actorId);
+      if (action === "submit_review") await api.submitReview(classId, detail.version);
+      if (action === "approve") await api.approveReview(classId, detail.version);
+      if (action === "reject") await api.rejectReview(classId, detail.version);
+      if (action === "cancel") await api.cancelClass(classId, detail.version);
       showToast("操作成功", "success");
-      await renderAdminClasses();
+      await renderRoute();
     } catch (error) {
       showToast(error.message || "操作失败", "error");
     }
   });
 }
 
-async function renderAdminClasses() {
-  const items = await api.getAdminClasses();
+async function renderAdminClasses(queryParams = new URLSearchParams()) {
+  const page = readPage(queryParams);
+  const filters = readClassFilters(queryParams);
+  const result = await api.getAdminClasses(page, LIST_PAGE_SIZE, filters);
+  const items = result.items || [];
+  const total = result.total ?? items.length;
+  const pageParams = new URLSearchParams(queryParams);
+  pageParams.delete("page");
+  const pageBaseHash = pageParams.toString() ? `#/admin/classes?${pageParams.toString()}` : "#/admin/classes";
   if (!items.length) {
-    setHtml(`<section class="panel admin-hero"><div><p class="section-kicker">Admin Classes</p><h2>课程管理</h2></div></section>${emptyStateHtml("暂无课程", "当前没有课程数据。")}`);
+    setHtml(`<section class="panel admin-hero"><div><p class="section-kicker">Admin Classes</p><h2>课程管理列表</h2></div></section>${classFilterHtml(filters)}${emptyStateHtml("暂无课程", "当前条件下没有课程记录。")}`);
+    bindAdminClassFilters();
     return;
   }
   const cards = items.map((item) => {
     const id = item.id || item.classId;
     return `
       <article class="panel admin-class-card">
-        <div class="admin-class-card-head"><div><h3>${escapeHtml(item.className)}</h3><p class="muted">ID：${escapeHtml(id)}</p></div>${statusChip(item.status, item.statusLabel || item.status)}</div>
+        <div class="admin-class-card-head"><div><h3>${item.className}</h3><p class="muted">ID：${id}</p></div>${statusChip(item.status, item.status)}</div>
         <dl class="admin-class-card-info">
-          <div><dt>课程类型</dt><dd>${escapeHtml(item.classType || "-")}</dd></div>
-          <div><dt>上课安排</dt><dd>${escapeHtml(item.scheduleTime || item.scheduleSummary || "-")}</dd></div>
+          <div><dt>课程类型</dt><dd>${item.classType || "-"}</dd></div>
+          <div><dt>上课时间</dt><dd>${item.scheduleTime || item.scheduleSummary || "-"}</dd></div>
           <div><dt>人数</dt><dd>${item.currentStudents ?? 0}/${item.minStudents ?? "-"}/${item.maxStudents ?? "-"}</dd></div>
-          <div><dt>报名截止</dt><dd>${escapeHtml(item.signupDeadline || "-")}</dd></div>
+          <div><dt>报名截止</dt><dd>${item.signupDeadline || "-"}</dd></div>
         </dl>
         <div class="action-tags">${(item.actions || []).map((action) => actionTag(action, id)).join("")}</div>
         <div class="actions"><a class="btn" href="#/admin/classes/${id}">查看</a><a class="btn" href="#/admin/classes/${id}/edit">编辑</a></div>
@@ -828,66 +1195,137 @@ async function renderAdminClasses() {
   }).join("");
   setHtml(`
     <section class="panel admin-hero">
-      <div><p class="section-kicker">Admin Classes</p><h2>课程管理</h2><p class="muted admin-hero-text">查看课程状态、审核流程和运营数据。</p></div>
-      <div class="admin-summary-grid"><div class="summary-pill"><span class="summary-label">课程总数</span><strong class="summary-value">${items.length}</strong></div><div class="summary-pill"><a class="btn primary" href="#/admin/classes/new">新建课程</a></div></div>
+      <div><p class="section-kicker">Admin Classes</p><h2>课程管理列表</h2><p class="muted admin-hero-text">集中查看课程状态、人数、截止时间与可操作动作。</p></div>
+      <div class="admin-summary-grid"><div class="summary-pill"><span class="summary-label">课程总数</span><strong class="summary-value">${total}</strong></div><div class="summary-pill"><a class="btn primary" href="#/admin/classes/new">新建课程</a></div></div>
     </section>
+    ${classFilterHtml(filters)}
     <section id="admin-class-action-list" class="grid admin-class-grid">${cards}</section>
+    ${paginationHtml(pageBaseHash, page, LIST_PAGE_SIZE, total)}
   `);
+  bindAdminClassFilters();
   bindAdminClassQuickActions();
 }
 
-async function renderAdminRegistrations() {
-  const { actorId, actorRoles } = getActorContext();
-  const result = await api.getAdminRegistrations(actorId, actorRoles);
+async function renderAdminDashboard() {
+  const data = await api.getAdminDashboard();
+  setHtml(`
+    <section class="panel admin-hero">
+      <div><p class="section-kicker">Operations Dashboard</p><h2>运营看板</h2><p class="muted admin-hero-text">集中查看课程发布、报名跟进和候补压力。</p></div>
+      <div class="actions"><a class="btn primary" href="#/admin/registrations?registrationStatus=SUBMITTED">待确认报名</a><a class="btn" href="#/admin/classes?status=PENDING_REVIEW">待审核课程</a></div>
+    </section>
+    <section class="admin-dashboard-grid">
+      <article class="panel summary-pill"><span class="summary-label">课程总数</span><strong class="summary-value">${data.classCount ?? 0}</strong></article>
+      <article class="panel summary-pill"><span class="summary-label">已发布课程</span><strong class="summary-value">${data.publishedClassCount ?? 0}</strong></article>
+      <article class="panel summary-pill"><span class="summary-label">待审核课程</span><strong class="summary-value">${data.pendingReviewCount ?? 0}</strong></article>
+      <article class="panel summary-pill"><span class="summary-label">报名中课程</span><strong class="summary-value">${data.openEnrollmentCount ?? 0}</strong></article>
+      <article class="panel summary-pill"><span class="summary-label">报名总数</span><strong class="summary-value">${data.registrationCount ?? 0}</strong></article>
+      <article class="panel summary-pill"><span class="summary-label">待确认报名</span><strong class="summary-value">${data.submittedRegistrationCount ?? 0}</strong></article>
+      <article class="panel summary-pill"><span class="summary-label">候补中记录</span><strong class="summary-value">${data.waitlistedRegistrationCount ?? 0}</strong></article>
+      <article class="panel summary-pill"><span class="summary-label">课程候补人数</span><strong class="summary-value">${data.totalWaitlistCount ?? 0}</strong></article>
+    </section>
+    <section class="admin-dashboard-grid dashboard-business-grid">
+      <article class="panel summary-pill"><span class="summary-label">满班率</span><strong class="summary-value">${formatRate(data.fullClassRate)}</strong></article>
+      <article class="panel summary-pill"><span class="summary-label">报名转化率</span><strong class="summary-value">${formatRate(data.registrationConversionRate)}</strong></article>
+      <article class="panel summary-pill"><span class="summary-label">有效报名</span><strong class="summary-value">${data.validRegistrationCount ?? 0}</strong></article>
+      <article class="panel summary-pill"><span class="summary-label">平均报名/发布课</span><strong class="summary-value">${data.averageRegistrationsPerPublishedClass ?? 0}</strong></article>
+    </section>
+    <section class="panel dashboard-worklist">
+      <h3>待处理入口</h3>
+      <div class="dashboard-worklist-actions">
+        <a class="btn" href="#/admin/registrations?registrationStatus=SUBMITTED">查看待确认报名</a>
+        <a class="btn" href="#/admin/registrations?registerType=WAITLIST">查看候补报名</a>
+        <a class="btn" href="#/admin/classes?status=PENDING_REVIEW">查看待审核课程</a>
+      </div>
+    </section>
+  `);
+}
+
+async function renderAdminRegistrations(queryParams = new URLSearchParams()) {
+  const page = readPage(queryParams);
+  const filters = readRegistrationFilters(queryParams);
+  const result = await api.getAdminRegistrations(page, LIST_PAGE_SIZE, filters);
   const items = result.items || [];
+  const total = result.total ?? items.length;
+  const pageParams = new URLSearchParams(queryParams);
+  pageParams.delete("page");
+  const pageBaseHash = pageParams.toString() ? `#/admin/registrations?${pageParams.toString()}` : "#/admin/registrations";
   if (!items.length) {
-    setHtml(`<section class="panel admin-hero"><div><p class="section-kicker">Admin Registrations</p><h2>报名管理</h2></div></section>${emptyStateHtml("暂无报名", "当前没有报名记录。")}`);
+    setHtml(`<section class="panel admin-hero"><div><p class="section-kicker">Admin Registrations</p><h2>报名管理</h2></div></section>${registrationFilterHtml(filters)}${emptyStateHtml("暂无报名", "当前条件下没有报名记录。")}`);
+    bindAdminRegistrationFilters();
     return;
   }
   const summary = { ENROLLMENT: 0, WAITLIST: 0, TRIAL: 0 };
   items.forEach((item) => { if (summary[item.registerType] !== undefined) summary[item.registerType] += 1; });
   const cards = items.map((item) => `
     <article class="panel registration-card">
-      <div class="registration-card-head"><h3>${escapeHtml(item.studentName || "未填写学员")}</h3><div class="registration-card-chips">${registrationTypeChip(item.registerType)}${statusChip(item.registrationStatus, item.registrationStatus)}</div></div>
+      <div class="registration-card-head"><h3>${item.studentName || "未填写学员"}</h3><div class="registration-card-chips">${registrationTypeChip(item.registerType)}${statusChip(item.registrationStatus, item.registrationStatus)}</div></div>
       <dl class="registration-card-info">
-        <div><dt>家长</dt><dd>${escapeHtml(item.parentName || "-")}</dd></div>
-        <div><dt>联系电话</dt><dd>${escapeHtml(item.contactInfo || "-")}</dd></div>
-        <div><dt>年级</dt><dd>${escapeHtml(item.studentGrade || "-")}</dd></div>
-        <div><dt>课程名称</dt><dd>${escapeHtml(item.className || "-")}</dd></div>
+        <div><dt>家长</dt><dd>${item.parentName || "-"}</dd></div>
+        <div><dt>联系方式</dt><dd>${item.contactInfo || "-"}</dd></div>
+        <div><dt>学员年级</dt><dd>${item.studentGrade || "-"}</dd></div>
+        <div><dt>课程名称</dt><dd>${item.className || "-"}</dd></div>
       </dl>
-      <div class="registration-card-footer"><span class="muted">提交时间：${escapeHtml(item.submittedAt || "-")}</span><a class="btn" href="#/admin/registrations/${item.registrationId}">查看详情</a></div>
+      <div class="registration-card-footer"><span class="muted">提交时间：${item.submittedAt || "-"}</span><a class="btn" href="#/admin/registrations/${item.registrationId}">查看详情</a></div>
     </article>
   `).join("");
   setHtml(`
     <section class="panel admin-hero">
-      <div><p class="section-kicker">Admin Registrations</p><h2>报名管理</h2><p class="muted admin-hero-text">查看报名记录，维护跟进备注和报名状态。</p></div>
+      <div><p class="section-kicker">Admin Registrations</p><h2>报名管理</h2><p class="muted admin-hero-text">查看报名记录、跟进备注和状态。</p></div>
       <div class="admin-summary-grid registration-summary-grid">
-        <div class="summary-pill"><span class="summary-label">报名总数</span><strong class="summary-value">${items.length}</strong></div>
+        <div class="summary-pill"><span class="summary-label">报名总数</span><strong class="summary-value">${total}</strong></div>
         <div class="summary-pill"><span class="summary-label">报名</span><strong class="summary-value">${summary.ENROLLMENT}</strong></div>
         <div class="summary-pill"><span class="summary-label">候补</span><strong class="summary-value">${summary.WAITLIST}</strong></div>
-        <div class="summary-pill"><span class="summary-label">试听</span><strong class="summary-value">${summary.TRIAL}</strong></div>
+        <div class="summary-pill"><button id="registration-export-btn" type="button" class="btn primary">导出 CSV</button></div>
       </div>
     </section>
+    ${registrationFilterHtml(filters)}
     <section class="grid registration-card-grid">${cards}</section>
+    ${paginationHtml(pageBaseHash, page, LIST_PAGE_SIZE, total)}
   `);
+  bindAdminRegistrationFilters();
+  bindRegistrationExport();
+}
+
+function bindRegistrationExport() {
+  const button = document.getElementById("registration-export-btn");
+  if (!button) return;
+  button.addEventListener("click", async () => {
+    const restore = setButtonLoading(button, "导出中...");
+    try {
+      const csv = await api.exportAdminRegistrations();
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `registrations_${new Date().toISOString().replace(/[-:T]/g, "").slice(0, 14)}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      showToast("CSV 已导出", "success");
+      restore();
+    } catch (error) {
+      showToast(error.message || "导出失败", "error");
+      restore();
+    }
+  });
 }
 
 function bindRegistrationDetail(registrationId) {
   const noteForm = document.getElementById("registration-note-form");
   const statusForm = document.getElementById("registration-status-form");
-  const paymentForm = document.getElementById("registration-payment-form");
-  const { actorId, actorRoles } = getActorContext();
+  const promoteButton = document.getElementById("registration-promote-btn");
   if (noteForm) noteForm.addEventListener("submit", async (event) => {
     event.preventDefault();
     const button = noteForm.querySelector("button[type='submit']");
     const restore = setButtonLoading(button, "保存中...");
     try {
       const fd = new FormData(noteForm);
-      await api.updateRegistrationNotes(registrationId, { followUpNote: String(fd.get("followUpNote") || ""), notes: String(fd.get("notes") || ""), actorId, actorRoles });
+      await api.updateRegistrationNotes(registrationId, { followUpNote: String(fd.get("followUpNote") || ""), notes: String(fd.get("notes") || "") });
       showToast("备注已保存", "success");
       await renderAdminRegistrationDetail(registrationId);
     } catch (error) {
-      showToast(error.message || "备注保存失败", "error");
+      showToast(error.message || "保存备注失败", "error");
       restore();
     }
   });
@@ -897,64 +1335,63 @@ function bindRegistrationDetail(registrationId) {
     const restore = setButtonLoading(button, "更新中...");
     try {
       const fd = new FormData(statusForm);
-      await api.updateRegistrationStatus(registrationId, { registrationStatus: String(fd.get("registrationStatus") || ""), actorId, actorRoles });
+      await api.updateRegistrationStatus(registrationId, { registrationStatus: String(fd.get("registrationStatus") || "") });
       showToast("状态已更新", "success");
       await renderAdminRegistrationDetail(registrationId);
     } catch (error) {
-      showToast(error.message || "状态更新失败", "error");
+      showToast(error.message || "更新状态失败", "error");
       restore();
     }
   });
-  if (paymentForm) paymentForm.addEventListener("submit", async (event) => {
-    event.preventDefault();
-    const button = paymentForm.querySelector("button[type='submit']");
-    const restore = setButtonLoading(button, "更新中...");
+  if (promoteButton) promoteButton.addEventListener("click", async () => {
+    if (!window.confirm("确认将该候补转为正式报名？")) return;
+    const restore = setButtonLoading(promoteButton, "转正中...");
     try {
-      const fd = new FormData(paymentForm);
-      await api.updateRegistrationPaymentStatus(registrationId, { paymentStatus: String(fd.get("paymentStatus") || ""), actorId, actorRoles });
-      showToast("缴费状态已更新", "success");
+      await api.promoteWaitlistRegistration(registrationId);
+      showToast("候补已转正", "success");
       await renderAdminRegistrationDetail(registrationId);
     } catch (error) {
-      showToast(error.message || "缴费状态更新失败", "error");
+      showToast(error.message || "候补转正失败", "error");
       restore();
     }
   });
 }
 
 async function renderAdminRegistrationDetail(registrationId) {
-  const { actorId, actorRoles } = getActorContext();
-  const detail = await api.getAdminRegistrationDetail(registrationId, actorId, actorRoles);
+  const detail = await api.getAdminRegistrationDetail(registrationId);
   if (!detail) {
     setHtml(errorStateHtml("报名记录不存在", "#/admin/registrations"));
     return;
   }
+  const promoteButton = detail.registerType === "WAITLIST" && detail.registrationStatus === "WAITLISTED"
+    ? '<button id="registration-promote-btn" type="button" class="btn primary">转为正式报名</button>'
+    : "";
   setHtml(`
     <section class="panel admin-detail-hero">
-      <div><p class="section-kicker">Registration Detail</p><h2>报名详情</h2><p class="muted detail-subtitle">报名编号：${escapeHtml(detail.registrationId)}</p></div>
+      <div><p class="section-kicker">Registration Detail</p><h2>报名详情</h2><p class="muted detail-subtitle">报名编号：${detail.registrationId}</p></div>
       <div class="registration-card-chips">${registrationTypeChip(detail.registerType)}${statusChip(detail.registrationStatus, detail.registrationStatus)}</div>
     </section>
     <section class="admin-detail-grid">
       <article class="panel admin-detail-main">
         <h3>报名信息</h3>
         <dl class="admin-detail-facts">
-          <div><dt>课程名称</dt><dd>${escapeHtml(detail.className || "-")}</dd></div>
-          <div><dt>家长姓名</dt><dd>${escapeHtml(detail.parentName || "-")}</dd></div>
-          <div><dt>联系电话</dt><dd>${escapeHtml(detail.contactInfo || "-")}</dd></div>
-          <div><dt>学员姓名</dt><dd>${escapeHtml(detail.studentName || "-")}</dd></div>
-          <div><dt>学员年级</dt><dd>${escapeHtml(detail.studentGrade || "-")}</dd></div>
-          <div><dt>英语基础</dt><dd>${escapeHtml(detail.englishLevel || "-")}</dd></div>
-          <div><dt>提交时间</dt><dd>${escapeHtml(detail.submittedAt || "-")}</dd></div>
-          <div><dt>更新时间</dt><dd>${escapeHtml(detail.updatedAt || "-")}</dd></div>
-          <div><dt>缴费状态</dt><dd>${escapeHtml(paymentStatusLabel(detail.paymentStatus))}</dd></div>
-          <div class="full-span"><dt>备注</dt><dd>${escapeHtml(detail.remark || "-")}</dd></div>
+          <div><dt>课程名称</dt><dd>${detail.className || "-"}</dd></div>
+          <div><dt>家长姓名</dt><dd>${detail.parentName || "-"}</dd></div>
+          <div><dt>联系方式</dt><dd>${detail.contactInfo || "-"}</dd></div>
+          <div><dt>学员姓名</dt><dd>${detail.studentName || "-"}</dd></div>
+          <div><dt>学员年级</dt><dd>${detail.studentGrade || "-"}</dd></div>
+          <div><dt>英语基础</dt><dd>${detail.englishLevel || "-"}</dd></div>
+          <div><dt>提交时间</dt><dd>${detail.submittedAt || "-"}</dd></div>
+          <div><dt>更新时间</dt><dd>${detail.updatedAt || "-"}</dd></div>
+          <div class="full-span"><dt>备注</dt><dd>${detail.remark || "-"}</dd></div>
         </dl>
       </article>
       <aside class="admin-detail-side">
         <section class="panel admin-side-card">
           <h3>跟进备注</h3>
           <form id="registration-note-form">
-            <div class="row"><label>跟进备注</label><textarea name="followUpNote">${escapeHtml(detail.followUpNote || "")}</textarea></div>
-            <div class="row"><label>内部备注</label><textarea name="notes">${escapeHtml(detail.notes || "")}</textarea></div>
+            <div class="row"><label>跟进备注</label><textarea name="followUpNote">${detail.followUpNote || ""}</textarea></div>
+            <div class="row"><label>内部备注</label><textarea name="notes">${detail.notes || ""}</textarea></div>
             <button type="submit" class="primary">保存备注</button>
           </form>
         </section>
@@ -965,11 +1402,12 @@ async function renderAdminRegistrationDetail(registrationId) {
             <div class="row"><label>报名状态</label><select name="registrationStatus"><option value="VALID" ${detail.registrationStatus === "VALID" ? "selected" : ""}>有效</option><option value="INVALID" ${detail.registrationStatus === "INVALID" ? "selected" : ""}>无效</option><option value="CANCELLED" ${detail.registrationStatus === "CANCELLED" ? "selected" : ""}>已取消</option></select></div>
             <button type="submit" class="primary">更新状态</button>
           </form>
-          <form id="registration-payment-form">
-            <div class="row"><label>缴费状态</label><select name="paymentStatus"><option value="UNPAID" ${detail.paymentStatus === "UNPAID" ? "selected" : ""}>未缴费</option><option value="PENDING_CONFIRMATION" ${detail.paymentStatus === "PENDING_CONFIRMATION" ? "selected" : ""}>待确认</option><option value="PAID" ${detail.paymentStatus === "PAID" ? "selected" : ""}>已缴费</option><option value="REFUNDED" ${detail.paymentStatus === "REFUNDED" ? "selected" : ""}>已退款</option></select></div>
-            <button type="submit" class="primary">更新缴费状态</button>
-          </form>
+          ${promoteButton ? `<div class="actions admin-detail-actions">${promoteButton}</div>` : ""}
           <div class="actions admin-detail-actions"><a class="btn" href="#/admin/registrations">返回报名列表</a></div>
+        </section>
+        <section class="panel admin-side-card">
+          <h3>操作历史</h3>
+          ${operationHistoryHtml(detail.operationHistory || [])}
         </section>
       </aside>
     </section>
@@ -977,108 +1415,46 @@ async function renderAdminRegistrationDetail(registrationId) {
   bindRegistrationDetail(registrationId);
 }
 
-function loginPageHtml() {
-  return `
-    <section class="panel login-panel">
-      <p class="section-kicker">Account Login</p>
-      <h2>登录报名账号</h2>
-      <p class="muted">登录后可查看自己的历史拼课、待拼课和待开课记录。</p>
-      <form id="login-form" class="login-form">
-        <div class="row"><label>用户名</label><input name="username" required placeholder="admin" /></div>
-        <div class="row"><label>密码</label><input name="password" type="password" required placeholder="123456" /></div>
-        <button type="submit" class="primary">登录</button>
-      </form>
-    </section>
-  `;
-}
-
-function bindLoginPage(queryParams) {
-  const form = document.getElementById("login-form");
-  if (!form) return;
-  form.addEventListener("submit", async (event) => {
-    event.preventDefault();
-    const button = form.querySelector("button[type='submit']");
-    const restore = setButtonLoading(button, "登录中...");
-    try {
-      const fd = new FormData(form);
-      const username = String(fd.get("username") || "").trim();
-      const password = String(fd.get("password") || "");
-      const session = await api.login(username, password);
-      persistActorContext(session.actorId, session.actorRoles);
-      showToast("登录成功", "success");
-      const next = queryParams.get("next") || "#/public/classes";
-      window.location.hash = next;
-    } catch (error) {
-      showToast(error.message || "登录失败", "error");
-      restore();
-    }
-  });
-}
-
-function logoutAndBackToLogin() {
-  api.logout();
-  showToast("已退出登录", "info");
-  const next = encodeURIComponent(window.location.hash || "#/public/classes");
-  navigateTo(`#/login?next=${next}`);
-}
-
 async function renderRoute() {
+  syncAdminIdentityDefaults();
+  api.refreshActor();
   syncAdminNav();
   syncNavState();
   setHtml(loadingHtml());
 
   const hash = window.location.hash || "#/public/classes";
-  if (hash.startsWith("#/admin")) {
-    setHtml(errorStateHtml("管理后台已从课程前台拆分，请使用独立后台入口访问。", "#/public/classes"));
+  if (!isAdminMode() && hash.startsWith("#/admin")) {
+    window.location.hash = "#/public/classes";
     return;
   }
 
   const { parts, queryParams } = getHashParts();
   try {
-    if (parts[0] === "login") {
-      setHtml(loginPageHtml());
-      bindLoginPage(queryParams);
-      return;
-    }
-    if (parts[0] === "account" && parts[1] === "registrations") {
-      if (!isLoggedIn()) {
-        navigateTo(`#/login?next=${encodeURIComponent("#/account/registrations")}`);
-        return;
-      }
-      return await renderMyRegistrations();
-    }
-    if (parts[0] === "public" && parts[1] === "classes" && !parts[2]) return await renderPublicList();
+    if (parts[0] === "public" && parts[1] === "classes" && !parts[2]) return await renderPublicList(queryParams);
     if (parts[0] === "public" && parts[1] === "classes" && parts[2]) return await renderPublicDetail(parts[2]);
     if (parts[0] === "public" && parts[1] === "enroll" && parts[2]) return await renderEnroll(parts[2], queryParams);
-    if (parts[0] === "admin" && parts[1] === "classes" && parts[2] === "new") return await renderAdminCreateClass();
+    if (parts[0] === "admin" && parts[1] === "dashboard") return await renderAdminDashboard();
+    if (parts[0] === "admin" && parts[1] === "classes" && parts[2] === "new") return await renderAdminCreateClass(queryParams);
     if (parts[0] === "admin" && parts[1] === "classes" && parts[3] === "edit") return await renderAdminEditClass(parts[2]);
-    if (parts[0] === "admin" && parts[1] === "classes" && !parts[2]) return await renderAdminClasses();
+    if (parts[0] === "admin" && parts[1] === "classes" && !parts[2]) return await renderAdminClasses(queryParams);
     if (parts[0] === "admin" && parts[1] === "classes" && parts[2]) return await renderAdminClassDetail(parts[2]);
-    if (parts[0] === "admin" && parts[1] === "registrations" && !parts[2]) return await renderAdminRegistrations();
+    if (parts[0] === "admin" && parts[1] === "templates" && parts[2] === "new") return await renderAdminCreateTemplate();
+    if (parts[0] === "admin" && parts[1] === "templates" && parts[3] === "edit") return await renderAdminEditTemplate(parts[2]);
+    if (parts[0] === "admin" && parts[1] === "templates" && !parts[2]) return await renderAdminTemplates();
+    if (parts[0] === "admin" && parts[1] === "registrations" && !parts[2]) return await renderAdminRegistrations(queryParams);
     if (parts[0] === "admin" && parts[1] === "registrations" && parts[2]) return await renderAdminRegistrationDetail(parts[2]);
   } catch (error) {
-    if ((error.message || "").includes("bearer token")) {
-      logoutAndBackToLogin();
-      return;
-    }
     setHtml(errorStateHtml(error.message || "页面加载失败", "#/public/classes"));
     return;
   }
-  navigateTo("#/public/classes");
+  window.location.hash = "#/public/classes";
 }
 
 window.addEventListener("hashchange", () => {
   renderRoute();
 });
 
-document.addEventListener("click", (event) => {
-  const link = event.target.closest("a[href^='#/']");
-  if (!link) return;
-  const target = link.getAttribute("href");
-  if (!target) return;
-  event.preventDefault();
-  navigateTo(target);
-});
+document.getElementById("role-toggle")?.addEventListener("click", () => toggleAdminMode());
 
 syncAdminNav();
 renderRoute();

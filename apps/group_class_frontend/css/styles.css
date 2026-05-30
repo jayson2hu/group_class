@@ -386,8 +386,38 @@ img {
   box-shadow: 0 16px 30px rgba(37, 99, 235, 0.08);
 }
 
+.detail-cover-image {
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  box-shadow: 0 18px 36px rgba(15, 23, 42, 0.12);
+  margin-bottom: 16px;
+}
+
 .detail-side-card h3 {
   margin-bottom: 16px;
+}
+
+.share-link-btn {
+  width: 100%;
+  margin-top: 16px;
+}
+
+.manual-share-link {
+  overflow-wrap: anywhere;
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.88);
+}
+
+.sr-only-copy-input {
+  position: fixed;
+  left: -9999px;
+  top: 0;
 }
 
 .detail-content-grid {
@@ -623,8 +653,81 @@ img {
   cursor: pointer;
 }
 
+.action-tag-danger {
+  background: var(--danger-soft);
+  border-color: rgba(220, 38, 38, 0.28);
+  color: var(--danger);
+}
+
 .admin-class-form textarea {
   min-height: 80px;
+}
+
+.class-form-stepper {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.class-form-stepper span {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(191, 219, 254, 0.9);
+  background: rgba(239, 246, 255, 0.72);
+  color: var(--text-soft);
+  font-weight: 800;
+}
+
+.class-form-stepper strong {
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--primary);
+  color: #fff;
+  font-size: 13px;
+}
+
+.class-form-step {
+  position: relative;
+}
+
+.step-badge {
+  display: inline-block;
+  margin-bottom: 12px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: var(--primary-soft);
+  color: var(--primary-strong);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.checkbox-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: rgba(37, 99, 235, 0.05);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+.checkbox-row input {
+  width: 18px;
+  height: 18px;
+  margin-top: 2px;
+  flex: 0 0 auto;
 }
 
 .admin-detail-hero {
@@ -727,6 +830,38 @@ img {
   border: 1px solid rgba(191, 219, 254, 0.9);
   color: var(--text-soft);
   line-height: 1.7;
+}
+
+.class-card-decision-tags {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.decision-tag {
+  min-width: 0;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(191, 219, 254, 0.84);
+  background: rgba(239, 246, 255, 0.74);
+}
+
+.decision-tag span {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--primary);
+}
+
+.decision-tag strong {
+  display: block;
+  overflow: hidden;
+  color: var(--text-soft);
+  font-size: 14px;
+  line-height: 1.5;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .class-card-metrics {
@@ -897,11 +1032,71 @@ button.primary:focus-visible,
   box-shadow: 0 18px 32px rgba(37, 99, 235, 0.28);
 }
 
+button.danger,
+.btn.danger {
+  background: var(--danger);
+  border-color: transparent;
+  color: #fff;
+  box-shadow: 0 14px 28px rgba(220, 38, 38, 0.2);
+}
+
+button.danger:hover,
+.btn.danger:hover,
+button.danger:focus-visible,
+.btn.danger:focus-visible {
+  border-color: transparent;
+  box-shadow: 0 18px 32px rgba(220, 38, 38, 0.26);
+}
+
 button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
   transform: none;
   box-shadow: none;
+}
+
+.pagination-bar {
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) auto minmax(120px, 1fr);
+  align-items: center;
+  gap: 12px;
+  margin: 18px 0 4px;
+}
+
+.pagination-btn:first-child {
+  justify-self: start;
+}
+
+.pagination-btn:last-child {
+  justify-self: end;
+}
+
+.pagination-status {
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 700;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.pagination-spacer {
+  min-height: 42px;
+}
+
+.filter-bar {
+  display: grid;
+  grid-template-columns: minmax(150px, 0.8fr) minmax(220px, 1.2fr) minmax(180px, 1fr) auto;
+  align-items: end;
+  gap: 12px;
+}
+
+.filter-actions {
+  align-items: end;
+  margin: 0;
+}
+
+.registration-filter-bar {
+  grid-template-columns: minmax(150px, 0.8fr) minmax(150px, 0.8fr) minmax(220px, 1.2fr) auto;
 }
 
 form {
@@ -1180,6 +1375,13 @@ tbody tr:hover {
   background: linear-gradient(180deg, rgba(37, 99, 235, 0.12), rgba(255, 255, 255, 0.95));
 }
 
+.detail-highlights-panel p {
+  margin: 0;
+  color: var(--text-soft);
+  line-height: 1.8;
+  white-space: pre-line;
+}
+
 .detail-bottom-cta {
   position: sticky;
   bottom: 0;
@@ -1234,6 +1436,77 @@ tbody tr:hover {
   margin: 8px 0;
 }
 
+.success-process h3 {
+  margin-bottom: 14px;
+}
+
+.success-step-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.success-step {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 12px;
+  min-width: 0;
+  padding: 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(191, 219, 254, 0.9);
+  background: rgba(239, 246, 255, 0.74);
+}
+
+.success-step span {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--primary);
+  color: #fff;
+  font-weight: 800;
+}
+
+.success-step strong {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--text);
+}
+
+.success-step p {
+  margin: 0;
+  line-height: 1.6;
+}
+
+.success-similar h3 {
+  margin-bottom: 14px;
+}
+
+.success-similar-list {
+  display: grid;
+  gap: 10px;
+}
+
+.success-similar-item {
+  display: grid;
+  gap: 4px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1px solid rgba(191, 219, 254, 0.9);
+  background: rgba(239, 246, 255, 0.74);
+  text-decoration: none;
+}
+
+.success-similar-item strong {
+  color: var(--text);
+}
+
+.success-similar-item span {
+  color: var(--text-soft);
+  line-height: 1.5;
+}
+
 .public-faq-panel {
   background: linear-gradient(180deg, rgba(37, 99, 235, 0.12), rgba(255, 255, 255, 0.96));
 }
@@ -1261,6 +1534,14 @@ tbody tr:hover {
 
 .admin-class-grid {
   grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+}
+
+.template-card-grid {
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+}
+
+.template-card {
+  margin-bottom: 0;
 }
 
 .admin-class-card-head {
@@ -1295,8 +1576,38 @@ tbody tr:hover {
   color: var(--text-soft);
 }
 
+.checkbox-row label {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.checkbox-row input {
+  width: auto;
+}
+
 .registration-summary-grid {
   grid-template-columns: repeat(4, minmax(120px, 1fr));
+}
+
+.admin-dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(150px, 1fr));
+  gap: 12px;
+}
+
+.dashboard-worklist h3 {
+  margin-bottom: 14px;
+}
+
+.dashboard-business-grid {
+  margin-top: 12px;
+}
+
+.dashboard-worklist-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
 }
 
 .registration-card-grid {
@@ -1352,6 +1663,38 @@ tbody tr:hover {
   gap: 10px;
 }
 
+.operation-timeline {
+  display: grid;
+  gap: 12px;
+}
+
+.operation-item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+}
+
+.operation-dot {
+  width: 10px;
+  height: 10px;
+  margin-top: 6px;
+  border-radius: 50%;
+  background: var(--primary);
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.12);
+}
+
+.operation-item strong {
+  display: block;
+  margin-bottom: 2px;
+  color: var(--text);
+}
+
+.operation-item p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
 .chip.ENROLLMENT {
   background: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%);
 }
@@ -1393,6 +1736,7 @@ tbody tr:hover {
   .list-hero-summary,
   .class-card-metrics,
   .class-card-facts,
+  .class-card-decision-tags,
   .detail-metrics,
   .enrollment-hero,
   .form-grid.two-columns,
@@ -1402,9 +1746,13 @@ tbody tr:hover {
   .admin-metric-grid,
   .admin-detail-facts,
   .success-grid,
+  .success-step-list,
+  .class-form-stepper,
   .faq-grid,
   .registration-summary-grid,
+  .admin-dashboard-grid,
   .registration-card-grid,
+  .template-card-grid,
   .registration-card-info,
   .admin-class-card-info {
     grid-template-columns: 1fr;
@@ -1439,6 +1787,23 @@ tbody tr:hover {
   .btn,
   button {
     width: 100%;
+  }
+
+  .pagination-bar {
+    grid-template-columns: 1fr;
+  }
+
+  .filter-bar {
+    grid-template-columns: 1fr;
+  }
+
+  .pagination-btn,
+  .pagination-status {
+    width: 100%;
+  }
+
+  .pagination-spacer {
+    display: none;
   }
 
   .panel,

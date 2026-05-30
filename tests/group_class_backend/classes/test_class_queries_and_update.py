@@ -2,9 +2,10 @@ from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 import sqlite3
 
-from apps.group_class_backend.audit.interface import NullAuditWriter
+from apps.group_class_backend.audit.interface import InMemoryAuditLog, NullAuditWriter
 from apps.group_class_backend.classes.controller import (
     approve_class_review,
+    cancel_class,
     create_class_draft,
     get_class_detail,
     list_classes,
@@ -60,6 +61,11 @@ def _seed_class(repository: InMemoryClassRepository | SQLiteClassRepository) -> 
             "className": "周末拼课",
             "priceAmount": 299,
             "minStudents": 6,
+            "maxStudents": 12,
+            "scheduleSummary": "每周六 10:00-11:30",
+            "targetAudience": "三至四年级学员",
+            "courseGoal": "提升阅读理解能力",
+            "groupRule": "满 6 人开班",
         },
         repository=repository,
         audit_writer=NullAuditWriter(),
@@ -399,6 +405,32 @@ def test_submit_class_review_transitions_draft_to_pending_review() -> None:
     assert response["data"]["actions"] == ["view"]
 
 
+def test_submit_class_review_rejects_incomplete_class() -> None:
+    repository = InMemoryClassRepository()
+    response = create_class_draft(
+        payload={"className": "信息不完整课程", "minStudents": 4},
+        repository=repository,
+        audit_writer=NullAuditWriter(),
+        request_id="req-create-incomplete-review-001",
+        actor_id="initiator-001",
+        now=datetime(2026, 4, 12, 12, 0, tzinfo=timezone.utc),
+    )
+
+    submit_response = submit_class_review(
+        class_id=response["data"]["classId"],
+        payload={"version": 1},
+        repository=repository,
+        audit_writer=NullAuditWriter(),
+        request_id="req-submit-review-incomplete-001",
+        actor_id="initiator-001",
+        now=datetime(2026, 4, 12, 13, 30, tzinfo=timezone.utc),
+    )
+
+    assert submit_response["code"] == ErrorCode.VALIDATION_INVALID_ARGUMENT
+    missing_fields = {detail["field"] for detail in submit_response["details"]}
+    assert {"priceAmount", "maxStudents", "scheduleSummary", "targetAudience", "courseGoal", "groupRule"}.issubset(missing_fields)
+
+
 
 def test_submit_class_review_rejects_non_draft_status() -> None:
     repository = InMemoryClassRepository()
@@ -568,7 +600,7 @@ def test_approve_class_review_allows_class_admin_and_persists_reviewer() -> None
     assert response["code"] == ErrorCode.OK
     assert response["data"]["status"] == ClassStatus.OPEN_FOR_ENROLLMENT
     assert response["data"]["version"] == 3
-    assert response["data"]["actions"] == ["view"]
+    assert response["data"]["actions"] == ["view", "cancel"]
     assert response["data"]["reviewerId"] == "reviewer-001"
     assert persisted is not None
     assert persisted.reviewer_id == "reviewer-001"
@@ -666,12 +698,13 @@ def test_sqlite_repository_persists_approve_review_flow() -> None:
 
 def test_reject_class_review_transitions_pending_review_to_rejected() -> None:
     repository = InMemoryClassRepository()
+    audit_writer = InMemoryAuditLog()
     class_id = _seed_class(repository)
     submit_class_review(
         class_id=class_id,
         payload={"version": 1},
         repository=repository,
-        audit_writer=NullAuditWriter(),
+        audit_writer=audit_writer,
         request_id="req-submit-review-before-reject-001",
         actor_id="initiator-001",
         now=datetime(2026, 4, 12, 13, 30, tzinfo=timezone.utc),
@@ -679,9 +712,9 @@ def test_reject_class_review_transitions_pending_review_to_rejected() -> None:
 
     response = reject_class_review(
         class_id=class_id,
-        payload={"version": 2},
+        payload={"version": 2, "reasonCode": "CONTENT_INCOMPLETE", "reasonText": "请补充课程亮点"},
         repository=repository,
-        audit_writer=NullAuditWriter(),
+        audit_writer=audit_writer,
         request_id="req-reject-review-001",
         actor_id="reviewer-001",
         actor_roles=["CLASS_ADMIN"],
@@ -694,6 +727,10 @@ def test_reject_class_review_transitions_pending_review_to_rejected() -> None:
     assert response["data"]["version"] == 3
     assert response["data"]["actions"] == ["view", "edit", "submit_review"]
     assert response["data"]["reviewerId"] == "reviewer-001"
+    assert response["data"]["reviewRejection"] == {"reasonCode": "CONTENT_INCOMPLETE", "reasonText": "请补充课程亮点"}
+    history = audit_writer.list_for_resource("class", class_id)
+    assert history[-1].metadata["reasonCode"] == "CONTENT_INCOMPLETE"
+    assert history[-1].metadata["reasonText"] == "请补充课程亮点"
     assert persisted is not None
     assert persisted.reviewer_id == "reviewer-001"
 
@@ -1135,9 +1172,6 @@ def test_list_classes_returns_paged_admin_items() -> None:
         "className",
         "status",
         "classType",
-        "openingLevel",
-        "levelMarker",
-        "displayColor",
         "startDate",
         "endDate",
         "signupDeadline",
@@ -1407,8 +1441,11 @@ def test_get_class_detail_public_only_returns_detail_content_from_sqlite_reposit
     created = create_class_draft(
         payload={
             "className": "寒假阅读班",
+            "priceAmount": 499,
             "minStudents": 6,
+            "maxStudents": 12,
             "courseSubtitle": "阅读专项提升",
+            "scheduleSummary": "每周六 10:00-11:30",
             "targetAudience": "适合四至六年级",
             "courseGoal": "提升阅读理解能力",
             "groupRule": "满 6 人开班",
@@ -1537,9 +1574,6 @@ def test_list_classes_public_only_returns_frontend_card_fields() -> None:
             max_students=6,
             current_students=6,
             waitlist_count=2,
-            opening_level="grade 4",
-            level_marker="L4",
-            display_color="#2563eb",
             updated_at=datetime(2026, 4, 12, 18, 0, tzinfo=timezone.utc),
         )
     )
@@ -1563,39 +1597,71 @@ def test_list_classes_public_only_returns_frontend_card_fields() -> None:
     assert item["primaryActionLabel"] == "加入候补"
     assert item["remainingSeats"] == 0
     assert item["waitlistCount"] == 2
-    assert item["openingLevel"] == "grade 4"
-    assert item["levelMarker"] == "L4"
-    assert item["displayColor"] == "#2563eb"
 
 
-def test_update_class_draft_persists_level_marker_color_and_contacts() -> None:
+def test_public_class_detail_returns_similar_classes() -> None:
     repository = InMemoryClassRepository()
-    class_id = _seed_class(repository)
-
-    response = update_class_draft(
-        class_id=class_id,
+    current_id = _seed_class(repository)
+    current = repository.get(current_id)
+    assert current is not None
+    repository.update(replace(current, status=ClassStatus.FULL, class_type="ENGLISH"))
+    similar_response = create_class_draft(
         payload={
-            "version": 1,
-            "openingLevel": "grade 5",
-            "levelMarker": "L5",
-            "displayColor": "#dc2626",
-            "wechatContact": "wechat_updated",
-            "phoneContact": "13900139000",
+            "className": "相近阅读班",
+            "priceAmount": 399,
+            "minStudents": 4,
+            "maxStudents": 8,
+            "scheduleSummary": "每周六 10:00-11:30",
+            "targetAudience": "三至四年级学员",
+            "courseGoal": "提升阅读理解能力",
+            "groupRule": "满 4 人开班",
         },
         repository=repository,
         audit_writer=NullAuditWriter(),
-        request_id="req-update-level-001",
-        actor_id="admin-001",
-        actor_roles=["CLASS_ADMIN"],
+        request_id="req-similar-create-001",
+        actor_id="initiator-001",
         now=datetime(2026, 4, 12, 19, 0, tzinfo=timezone.utc),
+    )
+    similar = repository.get(similar_response["data"]["classId"])
+    assert similar is not None
+    repository.update(replace(similar, status=ClassStatus.OPEN_FOR_ENROLLMENT, class_type="ENGLISH"))
+
+    response = get_class_detail(
+        class_id=current_id,
+        repository=repository,
+        request_id="req-public-detail-similar-001",
+        public_only=True,
     )
 
     assert response["code"] == ErrorCode.OK
-    assert response["data"]["openingLevel"] == "grade 5"
-    assert response["data"]["levelMarker"] == "L5"
-    assert response["data"]["displayColor"] == "#dc2626"
-    assert response["data"]["wechatContact"] == "wechat_updated"
-    assert response["data"]["phoneContact"] == "13900139000"
+    assert len(response["data"]["similarClasses"]) == 1
+    assert response["data"]["similarClasses"][0]["className"] == "相近阅读班"
+    assert response["data"]["similarClasses"][0]["primaryAction"] == "enroll"
+
+
+def test_public_list_hides_classes_after_signup_deadline() -> None:
+    repository = InMemoryClassRepository()
+    class_id = _seed_class(repository)
+    current = repository.get(class_id)
+    assert current is not None
+    repository.update(
+        replace(
+            current,
+            status=ClassStatus.OPEN_FOR_ENROLLMENT,
+            signup_deadline=datetime(2020, 1, 1, tzinfo=timezone.utc),
+        )
+    )
+
+    response = list_classes(
+        repository=repository,
+        request_id="req-public-list-expired-001",
+        page=1,
+        page_size=10,
+        public_only=True,
+    )
+
+    assert response["code"] == ErrorCode.OK
+    assert response["data"]["total"] == 0
 
 
 
@@ -1611,82 +1677,83 @@ def test_get_class_detail_returns_not_found() -> None:
     }
 
 
-def test_public_class_detail_hides_contacts_for_visitors() -> None:
+def test_cancel_class_allows_admin_for_published_status_and_hides_from_public() -> None:
     repository = InMemoryClassRepository()
     class_id = _seed_class(repository)
     current = repository.get(class_id)
     assert current is not None
-    repository.save(
-        replace(
-            current,
-            status=ClassStatus.OPEN_FOR_ENROLLMENT,
-            wechat_contact="teacher_wechat",
-            phone_contact="13800138000",
-        )
-    )
+    repository.update(replace(current, status=ClassStatus.OPEN_FOR_ENROLLMENT))
+    published = repository.get(class_id)
+    assert published is not None
 
-    response = get_class_detail(
+    response = cancel_class(
+        class_id=class_id,
+        payload={"version": published.version},
+        repository=repository,
+        audit_writer=NullAuditWriter(),
+        request_id="req-cancel-001",
+        actor_id="admin-001",
+        actor_roles=["CLASS_ADMIN"],
+        now=datetime(2026, 4, 12, 19, 0, tzinfo=timezone.utc),
+    )
+    public_detail = get_class_detail(
         class_id=class_id,
         repository=repository,
-        request_id="req-public-visitor-contact-001",
+        request_id="req-cancel-public-detail-001",
         public_only=True,
-        viewer_scope="visitor",
+    )
+    public_list = list_classes(
+        repository=repository,
+        request_id="req-cancel-public-list-001",
+        page=1,
+        page_size=10,
+        public_only=True,
     )
 
     assert response["code"] == ErrorCode.OK
-    assert "wechatContact" not in response["data"]
-    assert "phoneContact" not in response["data"]
+    assert response["data"]["status"] == ClassStatus.CANCELLED
+    assert public_detail["code"] == ErrorCode.CLASS_NOT_FOUND
+    assert public_list["data"]["items"] == []
 
 
-def test_public_class_detail_shows_wechat_only_for_logged_in_users() -> None:
+def test_cancel_class_rejects_initiator_role() -> None:
     repository = InMemoryClassRepository()
     class_id = _seed_class(repository)
     current = repository.get(class_id)
     assert current is not None
-    repository.save(
-        replace(
-            current,
-            status=ClassStatus.OPEN_FOR_ENROLLMENT,
-            wechat_contact="teacher_wechat",
-            phone_contact="13800138000",
-        )
-    )
+    repository.update(replace(current, status=ClassStatus.OPEN_FOR_ENROLLMENT))
+    published = repository.get(class_id)
+    assert published is not None
 
-    response = get_class_detail(
+    response = cancel_class(
         class_id=class_id,
+        payload={"version": published.version},
         repository=repository,
-        request_id="req-public-user-contact-001",
-        public_only=True,
-        viewer_scope="user",
+        audit_writer=NullAuditWriter(),
+        request_id="req-cancel-denied-001",
+        actor_id="initiator-001",
+        actor_roles=["INITIATOR"],
+        now=datetime(2026, 4, 12, 19, 10, tzinfo=timezone.utc),
     )
 
-    assert response["code"] == ErrorCode.OK
-    assert response["data"]["wechatContact"] == "teacher_wechat"
-    assert "phoneContact" not in response["data"]
+    assert response["code"] == ErrorCode.PERMISSION_DENIED
 
 
-def test_public_class_detail_shows_phone_for_backoffice_roles() -> None:
+def test_cancel_class_rejects_draft_status() -> None:
     repository = InMemoryClassRepository()
     class_id = _seed_class(repository)
     current = repository.get(class_id)
     assert current is not None
-    repository.save(
-        replace(
-            current,
-            status=ClassStatus.OPEN_FOR_ENROLLMENT,
-            wechat_contact="teacher_wechat",
-            phone_contact="13800138000",
-        )
-    )
 
-    response = get_class_detail(
+    response = cancel_class(
         class_id=class_id,
+        payload={"version": current.version},
         repository=repository,
-        request_id="req-public-backoffice-contact-001",
-        public_only=True,
-        viewer_scope="backoffice",
+        audit_writer=NullAuditWriter(),
+        request_id="req-cancel-draft-001",
+        actor_id="admin-001",
+        actor_roles=["CLASS_ADMIN"],
+        now=datetime(2026, 4, 12, 19, 20, tzinfo=timezone.utc),
     )
 
-    assert response["code"] == ErrorCode.OK
-    assert response["data"]["wechatContact"] == "teacher_wechat"
-    assert response["data"]["phoneContact"] == "13800138000"
+    assert response["code"] == ErrorCode.VALIDATION_INVALID_ARGUMENT

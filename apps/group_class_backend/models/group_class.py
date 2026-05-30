@@ -29,6 +29,9 @@ class GroupClass:
     display_color: str | None
     wechat_contact: str | None
     phone_contact: str | None
+    cover_image_url: str | None
+    highlights: str | None
+    owner_id: str | None
     target_audience: str | None
     unsuitable_audience: str | None
     course_goal: str | None
@@ -64,6 +67,9 @@ class GroupClass:
         display_color: str | None = None,
         wechat_contact: str | None = None,
         phone_contact: str | None = None,
+        cover_image_url: str | None = None,
+        highlights: str | None = None,
+        owner_id: str | None = None,
         target_audience: str | None = None,
         unsuitable_audience: str | None = None,
         course_goal: str | None = None,
@@ -114,6 +120,9 @@ class GroupClass:
             display_color=display_color,
             wechat_contact=wechat_contact,
             phone_contact=phone_contact,
+            cover_image_url=cover_image_url,
+            highlights=highlights,
+            owner_id=owner_id,
             target_audience=target_audience,
             unsuitable_audience=unsuitable_audience,
             course_goal=course_goal,

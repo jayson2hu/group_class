@@ -1,10 +1,10 @@
 # 本地启动说明（group_class）
 
-## 1. 当前可启动内容（2026-04-13）
+## 1. 当前可启动内容（FastAPI 迁移后）
 
 当前仓库已具备最小可运行的前后端联调能力：
 
-- 后端 API 入口：`apps/group_class_backend/server.py`
+- 后端 API 入口：`apps/group_class_backend/app.py`
 - 前端页面入口：`apps/group_class_frontend/index.html`
 - 后端测试：`tests/group_class_backend/`
 
@@ -13,8 +13,7 @@
 在仓库根目录执行：
 
 ```powershell
-$env:PYTHONPATH='d:/vscodefile/group_class'
-& 'D:/software/anacond/python.exe' -c "from apps.group_class_backend.server import run; run(port=18000)"
+uv run uvicorn apps.group_class_backend.app:app --host 0.0.0.0 --port 18000 --reload
 ```
 
 后端地址：
@@ -52,7 +51,7 @@ location.reload();
 后端自动化测试：
 
 ```powershell
-$env:PYTHONPATH='d:/vscodefile/group_class'; pytest -q tests/group_class_backend
+uv run pytest tests/ -q
 ```
 
 联调与问题记录见：`docs/integration-selftest-2026-04-13.md`。

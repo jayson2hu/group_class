@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Protocol
 
 from apps.group_class_backend.audit.interface import AuditEvent, AuditWriter
@@ -14,6 +14,25 @@ from apps.group_class_backend.models.group_class import GroupClass
 
 
 _ADMIN_REVIEW_ROLES = {"CLASS_ADMIN", "SUPER_ADMIN"}
+_CANCELLABLE_STATUSES = {
+    ClassStatus.OPEN_FOR_ENROLLMENT,
+    ClassStatus.ALMOST_CONFIRMED,
+    ClassStatus.CONFIRMED,
+    ClassStatus.FULL,
+    ClassStatus.WAITLIST_OPEN,
+    ClassStatus.IN_PROGRESS,
+}
+
+_REVIEW_REQUIRED_FIELDS: dict[str, str] = {
+    "className": "class_name",
+    "priceAmount": "price_amount",
+    "minStudents": "min_students",
+    "maxStudents": "max_students",
+    "scheduleSummary": "schedule_summary",
+    "targetAudience": "target_audience",
+    "courseGoal": "course_goal",
+    "groupRule": "group_rule",
+}
 
 
 class TemplateRepository(Protocol):
@@ -38,6 +57,9 @@ _MUTABLE_FIELD_MAP: dict[str, str] = {
     "displayColor": "display_color",
     "wechatContact": "wechat_contact",
     "phoneContact": "phone_contact",
+    "coverImageUrl": "cover_image_url",
+    "highlights": "highlights",
+    "ownerId": "owner_id",
     "targetAudience": "target_audience",
     "unsuitableAudience": "unsuitable_audience",
     "courseGoal": "course_goal",
@@ -67,6 +89,9 @@ _COPYABLE_CREATE_FIELDS: dict[str, str] = {
     "displayColor": "display_color",
     "wechatContact": "wechat_contact",
     "phoneContact": "phone_contact",
+    "coverImageUrl": "cover_image_url",
+    "highlights": "highlights",
+    "ownerId": "owner_id",
     "targetAudience": "target_audience",
     "unsuitableAudience": "unsuitable_audience",
     "courseGoal": "course_goal",
@@ -87,9 +112,6 @@ _LIST_ITEM_FIELDS = (
     "className",
     "status",
     "classType",
-    "openingLevel",
-    "levelMarker",
-    "displayColor",
     "startDate",
     "endDate",
     "signupDeadline",
@@ -106,6 +128,8 @@ _PUBLIC_LIST_ITEM_FIELDS = (
     "status",
     "statusLabel",
     "classType",
+    "coverImageUrl",
+    "highlights",
     "priceAmount",
     "openingLevel",
     "levelMarker",
@@ -118,12 +142,9 @@ _PUBLIC_LIST_ITEM_FIELDS = (
     "progressText",
     "primaryAction",
     "primaryActionLabel",
+    "coverImageUrl",
+    "highlights",
     "updatedAt",
-)
-
-_PUBLIC_LIST_OPTIONAL_FIELDS = (
-    "wechatContact",
-    "phoneContact",
 )
 
 _PUBLIC_VISIBLE_STATUSES = {
@@ -135,6 +156,19 @@ _PUBLIC_VISIBLE_STATUSES = {
     ClassStatus.IN_PROGRESS,
 }
 
+_PUBLIC_LIST_OPTIONAL_FIELDS = (
+    "wechatContact",
+    "phoneContact",
+)
+
+_ENROLLMENT_ACCEPTING_STATUSES = {
+    ClassStatus.OPEN_FOR_ENROLLMENT,
+    ClassStatus.ALMOST_CONFIRMED,
+    ClassStatus.CONFIRMED,
+    ClassStatus.FULL,
+    ClassStatus.WAITLIST_OPEN,
+}
+
 _STATUS_LABELS: dict[ClassStatus, str] = {
     ClassStatus.OPEN_FOR_ENROLLMENT: "报名中",
     ClassStatus.ALMOST_CONFIRMED: "即将成班",
@@ -142,6 +176,7 @@ _STATUS_LABELS: dict[ClassStatus, str] = {
     ClassStatus.FULL: "已满员",
     ClassStatus.WAITLIST_OPEN: "候补中",
     ClassStatus.IN_PROGRESS: "进行中",
+    ClassStatus.CANCELLED: "已取消",
 }
 
 
@@ -167,6 +202,9 @@ def _serialize_class(group_class: GroupClass) -> dict[str, object]:
         "displayColor": group_class.display_color,
         "wechatContact": group_class.wechat_contact,
         "phoneContact": group_class.phone_contact,
+        "coverImageUrl": group_class.cover_image_url,
+        "highlights": group_class.highlights,
+        "ownerId": group_class.owner_id,
         "targetAudience": group_class.target_audience,
         "unsuitableAudience": group_class.unsuitable_audience,
         "courseGoal": group_class.course_goal,
@@ -184,6 +222,17 @@ def _serialize_class(group_class: GroupClass) -> dict[str, object]:
         "createdAt": group_class.created_at.isoformat(),
         "updatedAt": group_class.updated_at.isoformat(),
     }
+
+
+def _class_response_with_review_rejection(data: dict[str, object], payload: dict[str, object]) -> dict[str, object]:
+    reason_code = str(payload.get("reasonCode") or "").strip()
+    reason_text = str(payload.get("reasonText") or "").strip()
+    if reason_code or reason_text:
+        data["reviewRejection"] = {
+            "reasonCode": reason_code or "OTHER",
+            "reasonText": reason_text,
+        }
+    return data
 
 
 
@@ -248,6 +297,9 @@ def _serialize_public_class(group_class: GroupClass, viewer_scope: str = "visito
         "primaryActionLabel": primary_action_label,
         "isWaitlistAvailable": group_class.status in {ClassStatus.FULL, ClassStatus.WAITLIST_OPEN},
         "courseSubtitle": group_class.course_subtitle,
+        "coverImageUrl": group_class.cover_image_url,
+        "highlights": group_class.highlights,
+        "ownerId": group_class.owner_id,
         "targetAudience": group_class.target_audience,
         "unsuitableAudience": group_class.unsuitable_audience,
         "courseGoal": group_class.course_goal,
@@ -266,6 +318,32 @@ def _serialize_public_class(group_class: GroupClass, viewer_scope: str = "visito
     if viewer_scope == "backoffice":
         data["phoneContact"] = group_class.phone_contact
     return data
+
+
+def _is_signup_expired(group_class: GroupClass, now: datetime | None = None) -> bool:
+    if group_class.signup_deadline is None or group_class.status not in _ENROLLMENT_ACCEPTING_STATUSES:
+        return False
+    current = now or datetime.now(timezone.utc)
+    deadline = group_class.signup_deadline
+    if deadline.tzinfo is None:
+        deadline = deadline.replace(tzinfo=timezone.utc)
+    return current > deadline
+
+
+def _similar_public_classes(repository: InMemoryClassRepository, current: GroupClass, limit: int = 3) -> list[dict[str, object]]:
+    candidates = [
+        item
+        for item in repository.list()
+        if item.class_id != current.class_id and item.status in _PUBLIC_VISIBLE_STATUSES
+    ]
+    candidates.sort(
+        key=lambda item: (
+            item.class_type != current.class_type,
+            item.status in {ClassStatus.FULL, ClassStatus.WAITLIST_OPEN},
+            item.updated_at,
+        )
+    )
+    return [_serialize_public_class(item) for item in candidates[:limit]]
 
 
 
@@ -320,6 +398,21 @@ def _template_inactive_error(request_id: str) -> dict[str, object]:
         request_id=request_id,
         code=ErrorCode.VALIDATION_INVALID_ARGUMENT,
         details=[{"field": "templateId", "message": "template is inactive"}],
+    )
+
+
+def _class_review_readiness_error(request_id: str, current: GroupClass) -> dict[str, object] | None:
+    details = []
+    for api_field, model_field in _REVIEW_REQUIRED_FIELDS.items():
+        value = getattr(current, model_field)
+        if value is None or (isinstance(value, str) and not value.strip()):
+            details.append({"field": api_field, "message": f"{api_field} is required before submitting review"})
+    if not details:
+        return None
+    return error_response(
+        request_id=request_id,
+        code=ErrorCode.VALIDATION_INVALID_ARGUMENT,
+        details=details,
     )
 
 
@@ -428,16 +521,19 @@ def _validate_payload(candidate: GroupClass) -> None:
         min_students=candidate.min_students,
         max_students=candidate.max_students,
         course_subtitle=candidate.course_subtitle,
-        target_audience=candidate.target_audience,
-        unsuitable_audience=candidate.unsuitable_audience,
-        course_goal=candidate.course_goal,
-        schedule_summary=candidate.schedule_summary,
-        session_count=candidate.session_count,
         opening_level=candidate.opening_level,
         level_marker=candidate.level_marker,
         display_color=candidate.display_color,
         wechat_contact=candidate.wechat_contact,
         phone_contact=candidate.phone_contact,
+        cover_image_url=candidate.cover_image_url,
+        highlights=candidate.highlights,
+        owner_id=candidate.owner_id,
+        target_audience=candidate.target_audience,
+        unsuitable_audience=candidate.unsuitable_audience,
+        course_goal=candidate.course_goal,
+        schedule_summary=candidate.schedule_summary,
+        session_count=candidate.session_count,
         group_rule=candidate.group_rule,
         absence_rule=candidate.absence_rule,
         waitlist_rule=candidate.waitlist_rule,
@@ -487,6 +583,9 @@ def create_class_draft(
             display_color=resolved_payload.get("displayColor"),
             wechat_contact=resolved_payload.get("wechatContact"),
             phone_contact=resolved_payload.get("phoneContact"),
+            cover_image_url=resolved_payload.get("coverImageUrl"),
+            highlights=resolved_payload.get("highlights"),
+            owner_id=resolved_payload.get("ownerId"),
             target_audience=resolved_payload.get("targetAudience"),
             unsuitable_audience=resolved_payload.get("unsuitableAudience"),
             course_goal=resolved_payload.get("courseGoal"),
@@ -597,6 +696,10 @@ def submit_class_review(
             details=[{"field": "status", "message": "only DRAFT or REJECTED classes can be submitted for review"}],
         )
 
+    readiness_error = _class_review_readiness_error(request_id, current)
+    if readiness_error is not None:
+        return readiness_error
+
     candidate = replace(current, status=ClassStatus.PENDING_REVIEW, updated_at=now)
     saved = repository.update(candidate)
     audit_writer.record(
@@ -701,11 +804,65 @@ def reject_class_review(
 
     candidate = replace(current, status=ClassStatus.REJECTED, reviewer_id=actor_id, updated_at=now)
     saved = repository.update(candidate)
+    reason_code = str(payload.get("reasonCode") or "").strip() or "OTHER"
+    reason_text = str(payload.get("reasonText") or "").strip()
     audit_writer.record(
         AuditEvent(
             request_id=request_id,
             actor_id=actor_id,
             action="class.review_rejected",
+            resource_type="class",
+            resource_id=saved.class_id,
+            metadata={
+                "previousStatus": current.status.value,
+                "status": saved.status.value,
+                "version": saved.version,
+                "reasonCode": reason_code,
+                "reasonText": reason_text,
+            },
+        )
+    )
+    return success_response(request_id=request_id, data=_class_response_with_review_rejection(_serialize_class(saved), payload))
+
+
+def cancel_class(
+    *,
+    class_id: str,
+    payload: dict[str, object],
+    repository: InMemoryClassRepository,
+    audit_writer: AuditWriter,
+    request_id: str,
+    actor_id: str,
+    actor_roles: list[str] | None = None,
+    now: datetime,
+) -> dict[str, object]:
+    current, error = _load_class_for_mutation(
+        class_id=class_id,
+        payload=payload,
+        repository=repository,
+        request_id=request_id,
+    )
+    if error is not None:
+        return error
+    assert current is not None
+
+    if current.status not in _CANCELLABLE_STATUSES:
+        return error_response(
+            request_id=request_id,
+            code=ErrorCode.VALIDATION_INVALID_ARGUMENT,
+            details=[{"field": "status", "message": "current class status cannot be cancelled"}],
+        )
+
+    if not _actor_has_role(actor_roles, _ADMIN_REVIEW_ROLES):
+        return _permission_denied(request_id, "actorRoles", "only CLASS_ADMIN or SUPER_ADMIN can cancel class")
+
+    candidate = replace(current, status=ClassStatus.CANCELLED, updated_at=now)
+    saved = repository.update(candidate)
+    audit_writer.record(
+        AuditEvent(
+            request_id=request_id,
+            actor_id=actor_id,
+            action="class.cancelled",
             resource_type="class",
             resource_id=saved.class_id,
             metadata={
@@ -732,7 +889,11 @@ def get_class_detail(
         return _not_found_error(request_id)
     if public_only and group_class.status not in _PUBLIC_VISIBLE_STATUSES:
         return _not_found_error(request_id)
+    if public_only and _is_signup_expired(group_class):
+        return _not_found_error(request_id)
     data = _serialize_public_class(group_class, viewer_scope=viewer_scope) if public_only else _serialize_class(group_class)
+    if public_only:
+        data["similarClasses"] = _similar_public_classes(repository, group_class)
     return success_response(request_id=request_id, data=data)
 
 
@@ -745,10 +906,23 @@ def list_classes(
     page_size: int,
     public_only: bool = False,
     viewer_scope: str = "visitor",
+    status_filter: list[str] | None = None,
+    creator_id_filter: str | None = None,
+    keyword: str | None = None,
 ) -> dict[str, object]:
     all_items = sorted(repository.list(), key=lambda item: item.updated_at, reverse=True)
     if public_only:
         all_items = [item for item in all_items if item.status in _PUBLIC_VISIBLE_STATUSES]
+        all_items = [item for item in all_items if not _is_signup_expired(item)]
+    if status_filter:
+        allowed_statuses = {status for status in status_filter if status}
+        all_items = [item for item in all_items if item.status.value in allowed_statuses]
+    if creator_id_filter:
+        all_items = [item for item in all_items if item.creator_id == creator_id_filter]
+    if keyword:
+        normalized_keyword = keyword.strip().lower()
+        if normalized_keyword:
+            all_items = [item for item in all_items if normalized_keyword in (item.class_name or "").lower()]
     start = max(page - 1, 0) * page_size
     end = start + page_size
     serialized_items = []
